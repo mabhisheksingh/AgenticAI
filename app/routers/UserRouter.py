@@ -1,11 +1,9 @@
+import logging
 from typing import Any
 
 from fastapi import APIRouter
 
 from app.services.UserService import get_user_service
-import logging
-import os
-
 
 user_router = APIRouter(prefix="/user", tags=["user"])
 
@@ -15,6 +13,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
 
 @user_router.get("/")
 async def get_user() -> dict[str, Any]:

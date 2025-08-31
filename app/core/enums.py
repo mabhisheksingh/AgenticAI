@@ -27,3 +27,8 @@ class ErrorCode(str, Enum):
     not_found = "NOT_FOUND"
     validation_error = "VALIDATION_ERROR"
     internal_error = "INTERNAL_ERROR"
+
+
+class LLMProvider(str, Enum):
+    openai = "openai"
+    ollama = "ollama"

@@ -21,11 +21,17 @@ app/
     exception_handlers.py    # Global handlers for AppError, validation errors, 500s
     middleware.py            # CorrelationIdMiddleware, RequestLoggingMiddleware
     response.py              # ok(), error(), paginate()
+  agents/
+    LLMFactory.py            # Factory to create LLMs (e.g., Ollama/OpenAI)
   routers/
     UserRouter.py            # /user endpoints
     AgenticRouter.py         # /agent endpoints
   services/
     UserService.py           # Example service implementation
+    AgentService.py          # LangGraph chat + to_plain_text normalization
+  utils/
+    __init__.py
+    text.py                  # to_plain_text() utility to normalize LangChain content
   dispatch.py                # Aggregates domain routers under /v{n}
   main.py                    # FastAPI app creation & bootstrapping
 
@@ -197,6 +203,22 @@ Typical next steps to expand:
 - Implement agent orchestration in `app/agents/` and call from services.
 - Add configuration for providers/stores under `app/config/`.
 - Write unit/integration tests for new routes/services.
+
+## Utilities
+- __Content normalization (`app/utils/text.py`)__
+  - `to_plain_text(content: Any) -> str` converts various LangChain message content shapes into plain text.
+  - Handles strings, lists of blocks (e.g., `{ "type": "text", "text": "..." }`), dicts with common keys, and objects exposing `.content`/`.text`.
+  - Used by `AgentService.execute()` to extract the final model answer from `AIMessage` content.
+
+Example:
+```bash
+python3 -c "from app.utils.text import to_plain_text; print(to_plain_text(['Hello', {'type':'text','text':'world'}]))"
+```
+Output:
+```
+Hello
+world
+```
 
 ## Troubleshooting
 - mypy error "Source file found twice under different module names": ensure `app/` and subfolders contain `__init__.py` so packages are explicit (already included).

@@ -2,13 +2,15 @@
 # Agentic AI Runtime Dependencies
 # ==============================
 # Note: Comments starting with '#' are ignored by pip.
-#       Keep only the providers/vector stores you actually use to keep the env lean.
+#       Keep only the providers/vector db you actually use to keep the env lean.
 
 # Agentic / LLM framework
 langgraph
 langchain
 langchain-community
 langsmith
+langchain-openai
+langchain-ollama
 
 # Model providers (install only those you need)
 openai
@@ -21,7 +23,7 @@ litellm
 sentence-transformers
 tiktoken
 
-# Vector stores (pick 1–2)
+# Vector db (pick 1–2)
 chromadb
 qdrant-client
 # weaviate-client
