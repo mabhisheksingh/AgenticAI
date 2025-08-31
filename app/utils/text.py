@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 
 def _coerce_str(value: Any) -> str:
@@ -14,31 +15,36 @@ def _extract_from_content_item(item: Any) -> str:
     # Direct string
     if isinstance(item, str):
         return item
-
-    # LangChain-style dict blocks, e.g. {"type": "text", "text": "..."}
+    # Dict-like
     if isinstance(item, dict):
-        # Prefer explicit text fields
-        for key in ("text", "content", "input", "message"):
-            if key in item and isinstance(item[key], (str, int, float)):
-                return _coerce_str(item[key])
-        # Sometimes the text is nested
-        nested = item.get("data") or item.get("page_content")
-        if isinstance(nested, (str, int, float)):
-            return _coerce_str(nested)
-        if isinstance(nested, dict) or isinstance(nested, list):
-            return to_plain_text(nested)
-        # Otherwise fall back to empty for non-text blocks (images, etc.)
-        return ""
+        return _extract_from_dict(item)
+    # Objects with attributes or anything else
+    return _extract_from_obj_with_attrs(item)
 
-    # Objects with a .text or .content attribute
+
+def _extract_from_dict(item: dict[str, Any]) -> str:
+    # Prefer explicit text fields
+    for key in ("text", "content", "input", "message"):
+        value = item.get(key)
+        if isinstance(value, str | int | float):
+            return _coerce_str(value)
+    # Sometimes the text is nested
+    nested = item.get("data") or item.get("page_content")
+    if isinstance(nested, str | int | float):
+        return _coerce_str(nested)
+    if isinstance(nested, dict | list):
+        return to_plain_text(nested)
+    # Otherwise fall back to empty for non-text blocks (images, etc.)
+    return ""
+
+
+def _extract_from_obj_with_attrs(item: Any) -> str:
     for attr in ("text", "content"):
         if hasattr(item, attr):
             try:
-                val = getattr(item, attr)
-                return to_plain_text(val)
+                return to_plain_text(getattr(item, attr))
             except Exception:
-                pass
-
+                continue
     return _coerce_str(item)
 
 
@@ -60,7 +66,7 @@ def to_plain_text(content: Any) -> str:
         return content
 
     # Iterable of content blocks
-    if isinstance(content, Iterable) and not isinstance(content, (bytes, bytearray, dict)):
+    if isinstance(content, Iterable) and not isinstance(content, bytes | bytearray | dict):
         parts: list[str] = []
         for it in content:
             part = _extract_from_content_item(it)

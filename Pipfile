@@ -29,6 +29,7 @@ python-dotenv = "*"
 uvicorn = {extras = ["standard"], version = "*"}
 langchain-openai = "*"
 langchain-ollama = "*"
+langgraph-checkpoint-sqlite = "*"
 
 [dev-packages]
 black = "*"

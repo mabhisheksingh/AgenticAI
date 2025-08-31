@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI
 
+from app.config.SqlLiteConfig import close_sql_lite_instance
 from app.core.exception_handlers import register_exception_handlers
 from app.core.middleware import CorrelationIdMiddleware, RequestLoggingMiddleware
 from app.dispatch import dispatch_router
@@ -22,6 +23,11 @@ def create_app() -> FastAPI:
 
     # Include the dispatch user_router (it already contains versioned paths like /v1/...)
     application.include_router(dispatch_router)
+
+    # Graceful shutdown: close the singleton SQLite connection
+    @application.on_event("shutdown")
+    def _close_db_conn() -> None:  # pragma: no cover - simple resource cleanup
+        close_sql_lite_instance()
     return application
 
 
