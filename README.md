@@ -56,6 +56,19 @@ LICENSE
 - Python 3.11+
 - pip (and optionally pipenv)
 - make (recommended for convenience)
+- Ollama (required by default, since `AgentService` uses the Ollama provider)
+  - Install: macOS/Linux
+    ```bash
+    curl -fsSL https://ollama.com/install.sh | sh
+    ```
+  - Pull a model (example):
+    ```bash
+    ollama pull llama3.1
+    ```
+  - Run server (usually auto-starts):
+    ```bash
+    ollama serve
+    ```
 
 ## Quick Start
 1) Clone and enter the repo
@@ -119,6 +132,9 @@ pipenv run uvicorn app.main:app --reload
 ```
 
 Open http://localhost:8000/docs for Swagger UI.
+
+Note:
+- If you prefer OpenAI instead of Ollama, switch the provider in `app/services/AgentService.py` (use `LLMProvider.openai`) and set `OPENAI_API_KEY` and `OPENAI_MODEL` in `.env`.
 
 ## Development Workflow
 - Format & import-order:
