@@ -1,0 +1,49 @@
+# ==============================
+# Agentic AI Runtime Dependencies
+# ==============================
+# Note: Comments starting with '#' are ignored by pip.
+#       Keep only the providers/vector stores you actually use to keep the env lean.
+
+# Agentic / LLM framework
+langgraph
+langchain
+langchain-community
+langsmith
+
+# Model providers (install only those you need)
+openai
+anthropic
+google-generativeai
+groq
+litellm
+
+# Embeddings / tokenization
+sentence-transformers
+tiktoken
+
+# Vector stores (pick 1–2)
+chromadb
+qdrant-client
+# weaviate-client
+# faiss-cpu
+# pinecone-client
+
+# API / Web
+fastapi
+pydantic
+pydantic-settings
+uvicorn[standard]
+sse-starlette
+python-multipart
+orjson
+
+# State / cache / queue (optional)
+redis
+# celery
+# rq
+
+# Observability / tracing (optional)
+opentelemetry-sdk
+
+# Config utils (optional)
+python-dotenv

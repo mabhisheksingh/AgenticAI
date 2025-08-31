@@ -1,0 +1,44 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+langgraph = "*"
+langchain = "*"
+langchain-community = "*"
+langsmith = "*"
+openai = "*"
+anthropic = "*"
+google-generativeai = "*"
+groq = "*"
+litellm = "*"
+sentence-transformers = "*"
+tiktoken = "*"
+chromadb = "*"
+qdrant-client = "*"
+fastapi = "*"
+pydantic = "*"
+pydantic-settings = "*"
+sse-starlette = "*"
+python-multipart = "*"
+orjson = "*"
+redis = "*"
+opentelemetry-sdk = "*"
+python-dotenv = "*"
+uvicorn = {extras = ["standard"], version = "*"}
+
+[dev-packages]
+black = "*"
+isort = "*"
+ruff = "*"
+mypy = "*"
+pytest = "*"
+pytest-asyncio = "*"
+pytest-cov = "*"
+httpx = "*"
+bandit = "*"
+pre-commit = "*"
+
+[requires]
+python_version = "3.11"
