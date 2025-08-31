@@ -10,6 +10,8 @@ A production-ready FastAPI backend for an Agentic AI application. Users submit a
 - **Standard response envelope** helpers for success and pagination (`ok()`, `paginate()`); errors use the list format.
 - **Observability middleware**: correlation ID propagation and request logging.
 - **Tooling**: Ruff, Black, isort, mypy, Bandit, pytest, pre-commit; unified `Makefile`.
+- **Agent chat with LangGraph**: compiled once per service instance for performance and persisted with SQLite checkpointer.
+- **SQLite singleton connection** with graceful shutdown to avoid connection churn and locking.
 
 ## Project Structure
 ```
@@ -29,11 +31,17 @@ app/
   services/
     UserService.py           # Example service implementation
     AgentService.py          # LangGraph chat + to_plain_text normalization
+  repositories/
+    ThreadRepository.py      # Session-thread mapping CRUD (snake_case API)
   utils/
     __init__.py
     text.py                  # to_plain_text() utility to normalize LangChain content
+  config/
+    SqlLiteConfig.py         # Singleton SQLite connection + schema + SQLITE_DB_PATH
   dispatch.py                # Aggregates domain routers under /v{n}
   main.py                    # FastAPI app creation & bootstrapping
+  db/
+    chat.db                  # Default SQLite database location (created on first run)
 
 requirements.txt             # Runtime deps
 requirements-dev.txt         # Dev/test/lint/type deps
@@ -70,18 +78,30 @@ pipenv install --dev
 ```
 
 3) Configure environment variables
-Create a `.env` file in the repository root:
+Create a `.env` file in the repository root (examples below). The default LLM provider in `AgentService` is Ollama.
+
 ```env
-# Server
+# --- Server ---
 HOST=0.0.0.0
 PORT=8000
 
-# Logging
-LOG_LEVEL=INFO
+# --- SQLite (optional) ---
+# Path to the SQLite DB file. Defaults to app/db/chat.db if not set.
+# SQLITE_DB_PATH=./app/db/chat.db
 
-# Model/Provider keys (add what you need; do not commit real keys)
-# OPENAI_API_KEY=
-# ANTHROPIC_API_KEY=
+# --- LLM settings ---
+# Common generation parameter
+LLM_TEMPERATURE=0.7
+
+# Provider-specific
+# Using Ollama (default in AgentService)
+OLLAMA_MODEL_NAME=llama3.1
+# Optionally point to a non-default Ollama server
+# OLLAMA_BASE_URL=http://localhost:11434
+
+# Using OpenAI (if you switch the provider in AgentService)
+# OPENAI_API_KEY=sk-...
+# OPENAI_MODEL=gpt-4o-mini
 ```
 
 4) Run the API server
@@ -131,15 +151,36 @@ make hooks
 ```
 
 ## API Overview (v1)
-The dispatch router aggregates domain routers under a version prefix. For example:
-- `GET /v1/user/` → simple user demo
-- `GET /v1/agent/` → example agent endpoint (placeholder)
+The dispatch router aggregates domain routers under a version prefix.
+
+- `POST /v1/agent/chat` — send a chat message to the agent graph
+  - Headers: `userId: <string>` (required), `threadId: <uuid>` (optional)
+  - Body: `{ "message": "Hello" }`
+  - Response: `ChatMessageResponse` with `threadId`, `userId`, `message`, `response`
+
+- `GET /v1/agent/threads` — list threads for the given user session
+  - Headers: `userId: <string>` (required)
+  - Response: `ok([...])` envelope of mappings `{id, session_id, thread_id, created_at}`
+
+- `DELETE /v1/agent/threads/{threadId}` — delete a specific thread for the user session
+  - Headers: `userId: <string>` (required)
+  - Response: `ok({ deleted: boolean, affected: number })`
 
 Example requests:
 ```bash
-curl -s http://localhost:8000/v1/user/
+# Chat (new thread will be created automatically)
+curl -s -X POST \
+  -H 'Content-Type: application/json' \
+  -H 'userId: user-123' \
+  http://localhost:8000/v1/agent/chat \
+  -d '{"message":"Hello!"}'
 
-curl -s http://localhost:8000/v1/agent/
+# List threads for a user
+curl -s -H 'userId: user-123' http://localhost:8000/v1/agent/threads
+
+# Delete a thread for a user
+curl -s -X DELETE -H 'userId: user-123' \
+  http://localhost:8000/v1/agent/threads/<thread-uuid>
 ```
 
 ### Response Format
@@ -224,6 +265,16 @@ world
 - mypy error "Source file found twice under different module names": ensure `app/` and subfolders contain `__init__.py` so packages are explicit (already included).
 - If Ruff import-order warnings appear, run `make format` to auto-fix.
 - If using `pipenv`, prefer running commands as `pipenv run <cmd>`.
+
+## Database & Persistence
+- Default DB path resolves to `app/db/chat.db` (created if not present). Override via `SQLITE_DB_PATH`.
+- A singleton SQLite connection is used for the app lifetime (see `app/config/SqlLiteConfig.py`).
+- On FastAPI shutdown, the connection is closed gracefully (`app/main.py`).
+
+## LangGraph & Checkpointing
+- The chat graph is compiled once per `LangGraphService` instance and reused for subsequent calls.
+- Checkpointing uses LangGraph's `SqliteSaver` with the singleton connection for performance and stability.
+- Threads are tracked via `session_threads` table. See `app/repositories/ThreadRepository.py`.
 
 ## Contributing
 - Use feature branches and submit PRs.

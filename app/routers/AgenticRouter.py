@@ -4,9 +4,9 @@ from uuid import UUID
 from fastapi import APIRouter, Header
 
 from app.core.enums import RouterTag
+from app.core.response import ok
 from app.schemas.chat import ChatMessageBody, ChatMessageResponse
 from app.services.AgentService import AgentService
-from app.services.UserService import get_user_service
 
 agentic_router = APIRouter(prefix="/agent", tags=[RouterTag.agent.value])
 agent_service = AgentService()
@@ -21,11 +21,19 @@ async def create_and_update_chat(
     return agent_service.create_and_update_chat(userId, threadId, payload.message)
 
 
-@agentic_router.get("/chat/history")
-async def get_all_chat_history() -> dict[str, Any]:
-    return get_user_service()
+# New endpoints: list and delete threads by session (user)
+@agentic_router.get("/threads")
+async def list_threads_by_session(
+    userId: Annotated[str, Header(...)],
+) -> dict[str, Any]:
+    rows = agent_service.list_threads_by_session(userId)
+    return ok(rows)
 
 
-@agentic_router.delete("/chat/delete/{thread_id}")
-async def delete_chat_by_thread_id() -> dict[str, Any]:
-    return get_user_service()
+@agentic_router.delete("/threads/{threadId}")
+async def delete_thread_by_session_and_id(
+    threadId: UUID,
+    userId: Annotated[str, Header(...)],
+) -> dict[str, Any]:
+    affected = agent_service.delete_thread_by_session_and_id(userId, str(threadId))
+    return ok({"deleted": affected > 0, "affected": affected})
