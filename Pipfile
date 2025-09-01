@@ -27,9 +27,9 @@ redis = "*"
 opentelemetry-sdk = "*"
 python-dotenv = "*"
 uvicorn = {extras = ["standard"], version = "*"}
-langchain-openai = "*"
 langchain-ollama = "*"
 langgraph-checkpoint-sqlite = "*"
+langchain-google-genai = "*"
 
 [dev-packages]
 black = "*"

@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config.SqlLiteConfig import close_sql_lite_instance
 from app.core.exception_handlers import register_exception_handlers
@@ -20,6 +21,17 @@ def create_app() -> FastAPI:
     # Cross-cutting middleware
     application.add_middleware(CorrelationIdMiddleware)
     application.add_middleware(RequestLoggingMiddleware)
+
+    # CORS for UI access (origins from env: CORS_ORIGINS="http://localhost:5173,https://your-app.com")
+    origins_env = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+    allow_origins = [o.strip() for o in origins_env.split(",") if o.strip()]
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=allow_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     # Include the dispatch user_router (it already contains versioned paths like /v1/...)
     application.include_router(dispatch_router)

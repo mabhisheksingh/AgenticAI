@@ -208,3 +208,7 @@ __marimo__/
 
 #intellij
 .idea/
+
+# UI (Vite React) build artifacts
+ui/node_modules/
+ui/dist/
