@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "800590ab6226b23705d867f4fbd75d4ab5befa77aff571286b3437bfb6a692a9"
+            "sha256": "91d5b275b2ab674234eb8c2c90cc269c526c191337644ebda1be3edb738ba265"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -407,6 +407,13 @@
             ],
             "markers": "python_version >= '3.9'",
             "version": "==3.19.1"
+        },
+        "filetype": {
+            "hashes": [
+                "sha256:66b56cd6474bf41d8c54660347d37afcc3f7d1970648de365c102ef77548aadb",
+                "sha256:7ce71b6880181241cf7ac8697a2f1eb6a8bd9b429f7ad6d27b8db9ba5f1c2d25"
+            ],
+            "version": "==1.2.0"
         },
         "flatbuffers": {
             "hashes": [
@@ -1000,6 +1007,15 @@
             "markers": "python_version >= '3.9'",
             "version": "==0.3.75"
         },
+        "langchain-google-genai": {
+            "hashes": [
+                "sha256:964a7542fd11fdec7592052b4eaef383227f7c4fa4d754a455e4bf0634f4ad28",
+                "sha256:b51067b468853856f275bb7b1a85dbaf4467b59fe67e35fcd614fc0d744c810e"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.9' and python_version < '4.0'",
+            "version": "==2.0.10"
+        },
         "langchain-ollama": {
             "hashes": [
                 "sha256:845192a75a1671bd36bc8c54baae2e929c3b1b0e3c8c618438df20354b0231de",
@@ -1008,15 +1024,6 @@
             "index": "pypi",
             "markers": "python_version >= '3.9'",
             "version": "==0.3.7"
-        },
-        "langchain-openai": {
-            "hashes": [
-                "sha256:3354f76822f7cc76d8069831fe2a77f9bc7ff3b4f13af788bd94e4c6e853b400",
-                "sha256:782ad669bd1bdb964456d8882c5178717adcfceecb482cc20005f770e43d346d"
-            ],
-            "index": "pypi",
-            "markers": "python_version >= '3.9'",
-            "version": "==0.3.32"
         },
         "langchain-text-splitters": {
             "hashes": [
@@ -1885,14 +1892,6 @@
             ],
             "markers": "python_version >= '3.9'",
             "version": "==11.3.0"
-        },
-        "pip": {
-            "hashes": [
-                "sha256:578283f006390f85bb6282dffb876454593d637f5d1be494b5202ce4877e71f2",
-                "sha256:6d67a2b4e7f14d8b31b8b52648866fa717f45a1eb70e83002f4331d07e953717"
-            ],
-            "markers": "python_version >= '3.9'",
-            "version": "==25.2"
         },
         "portalocker": {
             "hashes": [

@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import sqlite3
+from typing import Optional
 
 # Resolve an absolute path for the SQLite DB
 # Prefer env var SQLITE_DB_PATH; otherwise resolve relative to this file: app/db/chat.db
@@ -11,6 +12,7 @@ _CREATE_SESSION_THREAD_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS session_threads (
     id TEXT PRIMARY KEY,
     thread_id TEXT NOT NULL,
+    thread_label TEXT,
     session_id TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(session_id, thread_id)
@@ -20,13 +22,28 @@ CREATE INDEX IF NOT EXISTS idx_session_threads_thread ON session_threads(thread_
 """
 
 
+def migrate_add_thread_label(conn: sqlite3.Connection) -> None:
+    """Add thread_label column to session_threads table if it doesn't exist."""
+    try:
+        conn.execute("ALTER TABLE session_threads ADD COLUMN thread_label TEXT")
+        conn.commit()
+        print("Added thread_label column to session_threads table")
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" in str(e):
+            print("thread_label column already exists")
+        else:
+            raise
+
+
 def _ensure_schema(conn: sqlite3.Connection) -> None:
+    """Initialize database schema if needed."""
     # Enable WAL for better concurrency with LangGraph checkpointer
     try:
         conn.execute("PRAGMA journal_mode=WAL;")
     except Exception:
         pass
     conn.executescript(_CREATE_SESSION_THREAD_TABLE_SQL)
+    migrate_add_thread_label(conn)  # Run migration
     conn.commit()
 
 # Module-level singleton connection (avoid 'global' by using a state dict)

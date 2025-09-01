@@ -9,10 +9,12 @@ from app.config.SqlLiteConfig import get_sql_lite_instance
 class ThreadRepository:
     """Repository for session-thread mapping.
 
-    Table: session_threads(id, thread_id, session_id, created_at)
+    Table: session_threads(id, thread_id, thread_label, session_id, created_at)
     - id: primary key (UUID string)
     - thread_id: UUID string for conversation thread
+    - thread_label: Optional label for the thread (string)
     - session_id: user/session identifier (string)
+    - created_at: timestamp when the thread was created
     """
 
     @staticmethod
@@ -41,7 +43,7 @@ class ThreadRepository:
             (session_id, thread_id),
         )
         row = cur.fetchone()
-        return dict(row) if row else {"id": id, "session_id": session_id, "thread_id": thread_id}
+        return dict(row) if row else {"id": id, "session_id": session_id, "thread_id": thread_id, "thread_label": None}
 
     @staticmethod
     def get_thread_by_id(thread_id: str) -> dict[str, Any] | None:
@@ -49,7 +51,7 @@ class ThreadRepository:
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT id, session_id, thread_id, created_at
+            SELECT id, session_id, thread_id, thread_label, created_at
             FROM session_threads
             WHERE thread_id = ?
             LIMIT 1
@@ -65,7 +67,7 @@ class ThreadRepository:
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT id, session_id, thread_id, created_at
+            SELECT id, session_id, thread_id, thread_label, created_at
             FROM session_threads
             WHERE session_id = ?
             ORDER BY created_at DESC
@@ -103,3 +105,28 @@ class ThreadRepository:
         conn.commit()
         return cur.rowcount
 
+
+    @staticmethod
+    def rename_thread_label(session_id: str, thread_id: str, label: str) -> dict[str, Any] | None:
+        """Update thread label and return the updated thread info.
+        
+        Args:
+            session_id: The session ID
+            thread_id: The thread ID to update
+            label: The new label for the thread
+            
+        Returns:
+            The updated thread info as a dict, or None if not found
+        """
+        conn = get_sql_lite_instance()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            UPDATE session_threads
+            SET thread_label = ?
+            WHERE session_id = ? AND thread_id = ?
+            """,
+            (label, session_id, thread_id),
+        )
+        conn.commit()
+        return cur.rowcount

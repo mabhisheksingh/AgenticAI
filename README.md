@@ -50,7 +50,20 @@ mypy.ini                     # mypy config
 .pre-commit-config.yaml      # Git hooks
 Makefile                     # One-liner commands for quality gates
 LICENSE
-```
+ui/
+  .env
+  package.json
+  vite.config.js
+  src/
+    main.jsx
+    App.jsx
+    components/
+      ChatWindow.jsx
+      Sidebar.jsx
+      ThreadList.jsx
+    utils/
+      api.js
+      storage.js
 
 ## Prerequisites
 - Python 3.11+
@@ -69,6 +82,8 @@ LICENSE
     ```bash
     ollama serve
     ```
+- Node.js 18+
+- npm (comes with Node.js)
 
 ## Quick Start
 1) Clone and enter the repo
@@ -102,19 +117,18 @@ PORT=8000
 # Path to the SQLite DB file. Defaults to app/db/chat.db if not set.
 # SQLITE_DB_PATH=./app/db/chat.db
 
-# --- LLM settings ---
-# Common generation parameter
+# --- LLM Provider Selection ---
+LLM_PROVIDER=google_genai   # or 'ollama'
+
+# --- Google Gemini Settings ---
+GOOGLE_API_KEY=your-google-api-key
+GEMINI_MODEL_NAME=gemini-2.5-flash
+
+# --- Ollama Settings ---
+OLLAMA_MODEL_NAME=llama3.1:8b
+
+# --- Common LLM Settings ---
 LLM_TEMPERATURE=0.7
-
-# Provider-specific
-# Using Ollama (default in AgentService)
-OLLAMA_MODEL_NAME=llama3.1
-# Optionally point to a non-default Ollama server
-# OLLAMA_BASE_URL=http://localhost:11434
-
-# Using OpenAI (if you switch the provider in AgentService)
-# OPENAI_API_KEY=sk-...
-# OPENAI_MODEL=gpt-4o-mini
 ```
 
 4) Run the API server
@@ -131,10 +145,67 @@ python -m app.main
 pipenv run uvicorn app.main:app --reload
 ```
 
-Open http://localhost:8000/docs for Swagger UI.
+5) Run the UI
+```bash
+cd ui
+npm install
+npm run dev
+```
 
-Note:
-- If you prefer OpenAI instead of Ollama, switch the provider in `app/services/AgentService.py` (use `LLMProvider.openai`) and set `OPENAI_API_KEY` and `OPENAI_MODEL` in `.env`.
+Open http://localhost:5173 for the UI.
+
+## UI (React + Vite)
+
+A minimal React + Vite UI to interact with the FastAPI backend.
+
+### Prerequisites
+- Node.js 18+
+- npm (comes with Node.js)
+- Backend API (see above)
+
+### Setup & Run Locally
+1. Install dependencies:
+   ```bash
+   cd ui
+   npm install
+   ```
+2. Configure environment:
+   - Edit `ui/.env`:
+     - Set `VITE_API_BASE_URL` to your backend URL (e.g. `http://localhost:8080`)
+     - Set `VITE_API_PATH` to `/v1`
+3. Start the dev server:
+   ```bash
+   npm run dev
+   ```
+   Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+### Build for Production
+```bash
+npm run build
+npm run preview
+```
+
+### Features & UI Changes
+- Gmail-like light theme, Google blue accents, modern sidebar/chat layout
+- Sidebar threads can be renamed by double-clicking; press Enter or blur to save
+- Thread labels are shown in the sidebar and at the top of the chat
+- Selecting a thread clears the chat window for a fresh start
+- All API calls use `/v1` prefix and respect `.env` config
+
+### Environment
+- Uses `userId` and optional `threadId` headers expected by backend endpoint `POST /v1/agent/chat` with body `{ message: string }`.
+- `userId` is persisted in `localStorage`. `threadId` is saved after first response.
+
+---
+
+### Backend API Changes (relevant to UI)
+- Database migration: added `thread_label` column to `session_threads` table (auto-migrates on startup)
+- All thread-related endpoints now return `thread_label` in responses
+- New PATCH endpoint `/v1/agent/rename-thread-label` to rename a thread label (accepts `threadId` and `label` as query params, requires `userId` header)
+- All endpoints now consistently use `/v1` path prefix
+- ThreadRepository and related backend logic updated to support thread labels
+
+See above for backend setup and full details.
 
 ## Development Workflow
 - Format & import-order:
@@ -247,6 +318,49 @@ Successful responses use `ok()` and errors return a simple array of error items.
 ### Observability
 - Each request/response carries an `X-Correlation-ID`. You can provide one or the server will generate it.
 - Lightweight request logging includes method, path, status, duration, and correlation ID.
+
+## LLM Provider Configuration (Ollama & Google Gemini)
+
+The agent LLM selection and instantiation is handled by `app/agents/LLMFactory.py`, which is now optimized for clarity and error handling.
+
+### Environment Variables
+
+Set these in your `.env` file:
+
+```
+# --- LLM Provider Selection ---
+LLM_PROVIDER=google_genai   # or 'ollama'
+
+# --- Google Gemini Settings ---
+GOOGLE_API_KEY=your-google-api-key
+GEMINI_MODEL_NAME=gemini-2.5-flash
+
+# --- Ollama Settings ---
+OLLAMA_MODEL_NAME=llama3.1:8b
+
+# --- Common LLM Settings ---
+LLM_TEMPERATURE=0.7
+```
+
+### Usage in Code
+
+```python
+from app.agents.LLMFactory import LLMFactory
+
+# Create a chat model using the provider from env
+llm = LLMFactory.create()
+
+# Or specify provider/model/temperature explicitly
+llm = LLMFactory.create(
+    provider="ollama",  # or LLMProvider.ollama
+    model="llama3.1:8b",
+    temperature=0.8
+)
+```
+
+- Provider/model/temperature can be omitted to use environment defaults.
+- Errors are raised with clear messages if required env vars are missing or invalid.
+- Logging is improved for observability.
 
 ## Agentic AI Context
 This API is a backbone for an Agentic AI system:

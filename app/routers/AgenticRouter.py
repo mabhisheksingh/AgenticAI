@@ -37,3 +37,12 @@ async def delete_thread_by_session_and_id(
 ) -> dict[str, Any]:
     affected = agent_service.delete_thread_by_session_and_id(userId, str(threadId))
     return ok({"deleted": affected > 0, "affected": affected})
+
+@agentic_router.patch("/rename-thread-label")
+async def rename_thread_label(
+    threadId: UUID,
+    userId: Annotated[str, Header(...)],
+    label: str,
+) -> dict[str, Any]:
+    affected = agent_service.rename_thread_label(userId, str(threadId), label)
+    return ok({"renamed": affected > 0, "affected": affected})

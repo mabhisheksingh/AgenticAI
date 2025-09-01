@@ -30,5 +30,5 @@ class ErrorCode(str, Enum):
 
 
 class LLMProvider(str, Enum):
-    openai = "openai"
+    google_genai = "google_genai"
     ollama = "ollama"
