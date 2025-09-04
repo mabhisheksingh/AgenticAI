@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 import sqlite3
-from typing import Optional
 
 # Resolve an absolute path for the SQLite DB
 # Prefer env var SQLITE_DB_PATH; otherwise resolve relative to this file: app/db/chat.db
@@ -45,6 +44,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(_CREATE_SESSION_THREAD_TABLE_SQL)
     migrate_add_thread_label(conn)  # Run migration
     conn.commit()
+
 
 # Module-level singleton connection (avoid 'global' by using a state dict)
 _STATE: dict[str, sqlite3.Connection | None] = {"conn": None}

@@ -18,7 +18,9 @@ class ThreadRepository:
     """
 
     @staticmethod
-    def save(session_id: str, thread_id: str, id: str | None = None) -> dict[str, Any]:
+    def save(
+        session_id: str, thread_id: str, thread_label: str | None = None, id: str | None = None
+    ) -> dict[str, Any]:
         conn = get_sql_lite_instance()
         if id is None:
             id = str(uuid.uuid4())
@@ -26,16 +28,16 @@ class ThreadRepository:
         # Insert or ignore on existing unique(session_id, thread_id)
         cur.execute(
             """
-            INSERT OR IGNORE INTO session_threads (id, session_id, thread_id)
-            VALUES (?, ?, ?)
+            INSERT OR IGNORE INTO session_threads (id, session_id, thread_id, thread_label)
+            VALUES (?, ?, ?, ?)
             """,
-            (id, session_id, thread_id),
+            (id, session_id, thread_id, thread_label),
         )
         conn.commit()
         # Return the canonical stored row
         cur.execute(
             """
-            SELECT id, session_id, thread_id, created_at
+            SELECT id, session_id, thread_id, thread_label, created_at
             FROM session_threads
             WHERE session_id = ? AND thread_id = ?
             LIMIT 1
@@ -43,7 +45,16 @@ class ThreadRepository:
             (session_id, thread_id),
         )
         row = cur.fetchone()
-        return dict(row) if row else {"id": id, "session_id": session_id, "thread_id": thread_id, "thread_label": None}
+        return (
+            dict(row)
+            if row
+            else {
+                "id": id,
+                "session_id": session_id,
+                "thread_id": thread_id,
+                "thread_label": thread_label,
+            }
+        )
 
     @staticmethod
     def get_thread_by_id(thread_id: str) -> dict[str, Any] | None:
@@ -83,7 +94,7 @@ class ThreadRepository:
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT id, session_id, thread_id, created_at
+            SELECT id, session_id, thread_id, thread_label, created_at
             FROM session_threads
             WHERE session_id = ? AND thread_id = ?
             LIMIT 1
@@ -105,16 +116,15 @@ class ThreadRepository:
         conn.commit()
         return cur.rowcount
 
-
     @staticmethod
     def rename_thread_label(session_id: str, thread_id: str, label: str) -> dict[str, Any] | None:
         """Update thread label and return the updated thread info.
-        
+
         Args:
             session_id: The session ID
             thread_id: The thread ID to update
             label: The new label for the thread
-            
+
         Returns:
             The updated thread info as a dict, or None if not found
         """
