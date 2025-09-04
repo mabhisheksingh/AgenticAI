@@ -1,0 +1,1 @@
+// UI Components\nexport { default as ErrorBoundary } from './ErrorBoundary';

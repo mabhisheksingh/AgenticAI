@@ -40,6 +40,7 @@ def create_app() -> FastAPI:
     @application.on_event("shutdown")
     def _close_db_conn() -> None:  # pragma: no cover - simple resource cleanup
         close_sql_lite_instance()
+
     return application
 
 
