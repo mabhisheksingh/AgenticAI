@@ -25,9 +25,15 @@ export const api = {
       throw new Error('thread_label is required for all chat requests')
     }
     
+    // Ensure user_id is provided
+    if (!user_id) {
+      throw new Error('user_id is required for all chat requests')
+    }
+    
     // Build request body with message, optional thread_id, and mandatory thread_label
     const requestBody = { message, thread_label: threadLabel }
-    if (thread_id) {
+    // Only add thread_id if it's a valid non-null value
+    if (thread_id && thread_id !== 'null' && thread_id !== 'undefined' && thread_id !== 'None') {
       requestBody.thread_id = thread_id
     }
 
@@ -42,6 +48,15 @@ export const api = {
       const text = await res.text().catch(() => '')
       const err = new Error(text || `Request failed with ${res.status}`)
       err.status = res.status
+      // Log detailed error information for debugging
+      console.error('Chat API Error Details:', {
+        status: res.status,
+        statusText: res.statusText,
+        url: url,
+        headers: headers,
+        requestBody: requestBody,
+        responseText: text
+      })
       throw err
     }
 

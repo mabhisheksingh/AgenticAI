@@ -6,6 +6,7 @@ Interface Segregation Principle (ISP).
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 from collections.abc import AsyncGenerator
 from uuid import UUID
 
@@ -18,7 +19,7 @@ class AgentServiceInterface(ABC):
     """
     
     @abstractmethod
-    async def stream_chat_tokens(
+    def stream_chat_tokens(
         self,
         user_id: str,
         thread_id: UUID | None,
@@ -37,7 +38,7 @@ class AgentExecutionInterface(ABC):
     """
     
     @abstractmethod
-    async def execute_agent(
+    def execute_agent(
         self,
         message: str,
         thread_id: UUID | None,
@@ -60,6 +61,6 @@ class ConversationStateInterface(ABC):
         self, 
         thread_id: UUID, 
         user_id: str
-    ) -> any:  # StateSnapshot type from langgraph
+    ) -> Any:  # StateSnapshot type from langgraph
         """Retrieve conversation state for a specific thread."""
         pass

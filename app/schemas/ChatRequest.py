@@ -5,6 +5,7 @@ including validation rules and field constraints.
 """
 from __future__ import annotations
 
+from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
@@ -43,7 +44,7 @@ class ChatRequest(BaseModel):
         >>> print(long_request.thread_label)  # "This is a very long thread label that exceeds ten..."
     """
 
-    thread_id: UUID | None = None
+    thread_id: Optional[UUID | None] = None
     message: str
     thread_label: str = Field(
         ..., description="Thread label (max 10 words)"

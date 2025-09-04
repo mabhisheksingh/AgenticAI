@@ -43,9 +43,12 @@ const useChat = (user_id, thread_id, setThread_id) => {
     let firstTokenReceived = false; // Track if we've received the first token
 
     try {
+      // Normalize thread_id - ensure it's null for invalid values
+      const normalizedThreadId = thread_id && thread_id !== 'null' && thread_id !== 'undefined' && thread_id !== 'None' ? thread_id : null;
+      
       await api.chatStream({
         user_id,
-        thread_id,
+        thread_id: normalizedThreadId,
         message: text,
         threadLabel: generatedThreadLabel, // ALWAYS send thread label (mandatory)
         signal: controller.signal,
@@ -54,7 +57,7 @@ const useChat = (user_id, thread_id, setThread_id) => {
             const obj = JSON.parse(payload);
             
             // Handle thread ID update
-            if (obj?.threadId && !thread_id) {
+            if (obj?.threadId && !normalizedThreadId) {
               setThread_id(obj.threadId);
               return;
             }

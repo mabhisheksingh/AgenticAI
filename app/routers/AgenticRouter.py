@@ -7,6 +7,7 @@ Uses dependency injection following DIP principles.
 """
 from __future__ import annotations
 
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Header, Depends
@@ -107,7 +108,7 @@ async def create_and_update_chat(
         chat responses, enabling responsive user experiences in the frontend.
     """
     message: str = body.message
-    thread_id: UUID | None = body.thread_id
+    thread_id: Optional[UUID | None] = body.thread_id
     thread_label: str = body.thread_label  # Now mandatory
     response = agent_service.stream_chat_tokens(user_id, thread_id, message, thread_label)
     return StreamingResponse(

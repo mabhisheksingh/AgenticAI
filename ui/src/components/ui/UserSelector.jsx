@@ -94,16 +94,18 @@ const UserSelector = ({
         getOptionLabel={(option) => option?.label || ''}
         isOptionEqualToValue={(option, value) => option?.id === value?.id}
         disablePortal={false}
-        PopperProps={{
-          placement: 'bottom-start',
-          modifiers: [
-            {
-              name: 'offset',
-              options: {
-                offset: [0, 8],
+        slotProps={{
+          popper: {
+            placement: 'bottom-start',
+            modifiers: [
+              {
+                name: 'offset',
+                options: {
+                  offset: [0, 8],
+                },
               },
-            },
-          ],
+            ],
+          },
         }}
         renderInput={(params) => (
           <TextField
