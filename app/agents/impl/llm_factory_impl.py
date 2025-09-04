@@ -1,3 +1,10 @@
+"""LLM factory implementation for creating LLM instances.
+
+This module provides factory implementation for creating Large Language Model instances
+following the Factory pattern with support for multiple providers.
+
+Implements LLMProviderInterface following ISP and DIP principles.
+"""
 from __future__ import annotations
 
 import logging
@@ -10,14 +17,14 @@ from langchain_ollama import ChatOllama
 
 from app.core.enums import ErrorCode, LLMProvider
 from app.core.errors import ApiErrorItem, AppError
+from app.agents.llm_provider_interface import LLMProviderInterface
 
 logger = logging.getLogger(__name__)
 load_dotenv()
 
 
 def _error_item(errorcode, errormessage, errorStatus=400, errorField="provider"):
-    """
-    Create a standardized API error item.
+    """Create a standardized API error item.
     
     Args:
         errorcode (str): Error code identifying the type of error
@@ -39,8 +46,7 @@ def _error_item(errorcode, errormessage, errorStatus=400, errorField="provider")
 
 
 def _get_selected_llm_provider() -> LLMProvider:
-    """
-    Get the selected LLM provider from environment variables.
+    """Get the selected LLM provider from environment variables.
     
     Returns:
         LLMProvider: The selected LLM provider enum value
@@ -68,8 +74,7 @@ def _get_selected_llm_provider() -> LLMProvider:
 
 
 def _get_temperature() -> float:
-    """
-    Get the LLM temperature setting from environment variables.
+    """Get the LLM temperature setting from environment variables.
     
     Returns:
         float: Temperature value for LLM responses (0.0-1.0)
@@ -85,10 +90,10 @@ def _get_temperature() -> float:
         return 0.7
 
 
-class LLMFactory:
-    """
-    Factory class for creating LLM (Large Language Model) instances.
+class LLMFactoryImpl(LLMProviderInterface):
+    """Factory implementation for creating LLM (Large Language Model) instances.
     
+    Implements LLMProviderInterface following ISP and DIP principles.
     This factory supports multiple LLM providers including:
     - Ollama: Local LLM inference
     - Google Gemini: Google's generative AI service
@@ -97,19 +102,20 @@ class LLMFactory:
     and provides standardized error handling for missing configurations.
     """
     
-    @staticmethod
-    def create(
-        provider: LLMProvider | str | None = None,
+    def create_model(
+        self,
+        provider: str | None = None,
         *,
         model: str | None = None,
         temperature: float | None = None,
     ) -> BaseChatModel:
-        """
-        Create an LLM instance based on the specified or configured provider.
+        """Create an LLM instance based on the specified or configured provider.
+        
+        Implements the LLMProviderInterface contract for creating language models.
         
         Args:
-            provider (LLMProvider | str, optional): LLM provider to use.
-                                                   If None, uses LLM_PROVIDER env var.
+            provider (str, optional): LLM provider to use.
+                                     If None, uses LLM_PROVIDER env var.
             model (str, optional): Model name to use. If None, uses provider-specific env var.
             temperature (float, optional): Temperature for response generation.
                                          If None, uses LLM_TEMPERATURE env var.
@@ -119,37 +125,15 @@ class LLMFactory:
             
         Raises:
             AppError: If required environment variables are missing or invalid
-            
-        Environment Variables:
-            LLM_PROVIDER: Provider to use ('ollama' or 'google_genai')
-            LLM_TEMPERATURE: Temperature setting (default: 0.7)
-            
-            For Google Gemini:
-                GOOGLE_API_KEY: API key for Google Gemini
-                GEMINI_MODEL_NAME: Model name (e.g., 'gemini-2.5-flash')
-                
-            For Ollama:
-                OLLAMA_MODEL_NAME: Model name (e.g., 'llama3.1:8b')
-                
-        Examples:
-            >>> # Use environment configuration
-            >>> llm = LLMFactory.create()
-            
-            >>> # Specify provider and model
-            >>> llm = LLMFactory.create(
-            ...     provider="ollama",
-            ...     model="llama3.1:8b",
-            ...     temperature=0.8
-            ... )
         """
-        provider = (
-            provider
-            if isinstance(provider, LLMProvider)
-            else (LLMProvider(provider) if provider else _get_selected_llm_provider())
+        provider_enum = (
+            LLMProvider(provider)
+            if provider
+            else _get_selected_llm_provider()
         )
         temp = temperature if temperature is not None else _get_temperature()
 
-        if provider is LLMProvider.google_genai:
+        if provider_enum is LLMProvider.google_genai:
             model_name = model or os.getenv("GEMINI_MODEL_NAME")
             api_key = os.getenv("GOOGLE_API_KEY")
             if not model_name or not api_key:
@@ -169,9 +153,9 @@ class LLMFactory:
                 model_name,
                 temp,
             )
-            return ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, temperature=temp)
+            return ChatGoogleGenerativeAI(model=model_name, api_key=api_key, temperature=temp)
 
-        if provider is LLMProvider.ollama:
+        if provider_enum is LLMProvider.ollama:
             model_name = model or os.getenv("OLLAMA_MODEL_NAME")
             if not model_name:
                 item = _error_item(
@@ -191,7 +175,7 @@ class LLMFactory:
             return ChatOllama(model=model_name, temperature=temp)
 
         # Should never happen due to normalization, but guard anyway
-        item = _error_item(ErrorCode.validation_error.value, f"Unsupported provider '{provider}'")
+        item = _error_item(ErrorCode.validation_error.value, f"Unsupported provider '{provider_enum}'")
         raise AppError(
             message="Unsupported provider",
             code=ErrorCode.validation_error,

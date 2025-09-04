@@ -1,22 +1,35 @@
-"""Repository layer for thread and session management.
+"""Thread repository implementation for thread and session management.
 
 This module provides data access methods for managing conversation threads
 and their association with user sessions. It handles thread creation, retrieval,
 labeling, and deletion operations using SQLite as the persistence layer.
+
+Implements multiple segregated interfaces following ISP (Interface Segregation Principle)
+and uses dependency injection following DIP (Dependency Inversion Principle).
 """
 from __future__ import annotations
 
 from typing import Any
 import uuid
 
-from app.config.SqlLiteConfig import get_sql_lite_instance
+from app.repositories import (
+    ThreadRepositoryInterface,
+    UserRepositoryInterface,
+    ThreadQueryInterface,
+)
+from app.repositories import DatabaseConnectionProvider
 
 
-class ThreadRepository:
-    """Repository for session-thread mapping and thread management operations.
+class ThreadRepositoryImpl(ThreadRepositoryInterface, UserRepositoryInterface, ThreadQueryInterface):
+    """Repository implementation for session-thread mapping and thread management operations.
     
-    Provides static methods for CRUD operations on the session_threads table,
-    which maintains the relationship between user sessions and conversation threads.
+    Implements ISP by segregating interfaces:
+    - ThreadRepositoryInterface: Thread-specific operations
+    - UserRepositoryInterface: User-specific operations  
+    - ThreadQueryInterface: Read-only thread queries
+    
+    Uses DIP by depending on DatabaseConnectionProvider abstraction
+    instead of concrete SQLite implementation.
     
     Database Schema:
         session_threads table:
@@ -33,10 +46,17 @@ class ThreadRepository:
         - idx_session_threads_session: On session_id for fast user queries
         - idx_session_threads_thread: On thread_id for fast thread lookups
     """
+    
+    def __init__(self, db_provider: DatabaseConnectionProvider):
+        """Initialize repository with database connection provider.
+        
+        Args:
+            db_provider: Database connection provider (implements DIP)
+        """
+        self._db_provider = db_provider
 
-    @staticmethod
     def save(
-        session_id: str, thread_id: str, thread_label: str | None = None, id: str | None = None
+        self, session_id: str, thread_id: str, thread_label: str | None = None, id: str | None = None
     ) -> dict[str, Any]:
         """Save or update a session-thread mapping.
         
@@ -59,7 +79,7 @@ class ThreadRepository:
                 - created_at: Creation timestamp (if retrieved from DB)
                 
         Example:
-            >>> ThreadRepository.save("user123", "thread-uuid", "My Chat")
+            >>> thread_repo.save("user123", "thread-uuid", "My Chat")
             {
                 "id": "record-uuid",
                 "session_id": "user123",
@@ -68,7 +88,7 @@ class ThreadRepository:
                 "created_at": "2024-01-01 12:00:00"
             }
         """
-        conn = get_sql_lite_instance()
+        conn = self._db_provider.get_connection()
         if id is None:
             id = str(uuid.uuid4())
         cur = conn.cursor()
@@ -103,8 +123,7 @@ class ThreadRepository:
             }
         )
 
-    @staticmethod
-    def get_all_user() -> list[str]:
+    def get_all_users(self) -> list[str]:
         """Get all unique user/session IDs that have created threads.
         
         Returns a sorted list of all session IDs that have at least one
@@ -114,10 +133,10 @@ class ThreadRepository:
             list[str]: Sorted list of unique session IDs
             
         Example:
-            >>> ThreadRepository.get_all_user()
+            >>> thread_repo.get_all_users()
             ["admin", "user123", "user456"]
         """
-        conn = get_sql_lite_instance()
+        conn = self._db_provider.get_connection()
         cur = conn.cursor()
         cur.execute(
             """
@@ -129,8 +148,7 @@ class ThreadRepository:
         rows = cur.fetchall()
         return [row[0] for row in rows]
 
-    @staticmethod
-    def delete_user_by_id(user_id: str) -> int:
+    def delete_user_by_id(self, user_id: str) -> int:
         """Delete all threads for a specific user/session.
         
         Removes all thread records associated with the given session ID.
@@ -143,10 +161,10 @@ class ThreadRepository:
             int: Number of thread records deleted
             
         Example:
-            >>> ThreadRepository.delete_user_by_id("user123")
+            >>> thread_repo.delete_user_by_id("user123")
             5  # Deleted 5 threads for user123
         """
-        conn = get_sql_lite_instance()
+        conn = self._db_provider.get_connection()
         cur = conn.cursor()
         cur.execute(
             "DELETE FROM session_threads WHERE session_id = ?",
@@ -155,8 +173,7 @@ class ThreadRepository:
         conn.commit()
         return cur.rowcount
 
-    @staticmethod
-    def get_thread_by_id(thread_id: str) -> dict[str, Any] | None:
+    def get_thread_by_id(self, thread_id: str) -> dict[str, Any] | None:
         """Retrieve a thread record by its thread ID.
         
         Looks up a specific thread by its UUID, regardless of which
@@ -170,7 +187,7 @@ class ThreadRepository:
                 Contains id, session_id, thread_id, thread_label, created_at
                 
         Example:
-            >>> ThreadRepository.get_thread_by_id("thread-uuid")
+            >>> thread_repo.get_thread_by_id("thread-uuid")
             {
                 "id": "record-uuid",
                 "session_id": "user123",
@@ -179,7 +196,7 @@ class ThreadRepository:
                 "created_at": "2024-01-01 12:00:00"
             }
         """
-        conn = get_sql_lite_instance()
+        conn = self._db_provider.get_connection()
         cur = conn.cursor()
         cur.execute(
             """
@@ -193,8 +210,7 @@ class ThreadRepository:
         row = cur.fetchone()
         return dict(row) if row else None
 
-    @staticmethod
-    def get_session_by_id(session_id: str) -> list[dict[str, Any]]:
+    def get_session_by_id(self, session_id: str) -> list[dict[str, Any]]:
         """Get all threads for a specific session/user.
         
         Retrieves all conversation threads associated with a given session ID,
@@ -208,7 +224,7 @@ class ThreadRepository:
                 Each record contains id, session_id, thread_id, thread_label, created_at
                 
         Example:
-            >>> ThreadRepository.get_session_by_id("user123")
+            >>> thread_repo.get_session_by_id("user123")
             [
                 {
                     "id": "record-1",
@@ -226,7 +242,7 @@ class ThreadRepository:
                 }
             ]
         """
-        conn = get_sql_lite_instance()
+        conn = self._db_provider.get_connection()
         cur = conn.cursor()
         cur.execute(
             """
@@ -240,8 +256,7 @@ class ThreadRepository:
         rows = cur.fetchall()
         return [dict(r) for r in rows]
 
-    @staticmethod
-    def get_by_session_and_thread(session_id: str, thread_id: str) -> dict[str, Any] | None:
+    def get_by_session_and_thread(self, session_id: str, thread_id: str) -> dict[str, Any] | None:
         """Get a specific thread record by session and thread ID.
         
         Retrieves the thread record that matches both the session ID and thread ID.
@@ -256,7 +271,7 @@ class ThreadRepository:
                 Contains id, session_id, thread_id, thread_label, created_at
                 
         Example:
-            >>> ThreadRepository.get_by_session_and_thread("user123", "thread-uuid")
+            >>> thread_repo.get_by_session_and_thread("user123", "thread-uuid")
             {
                 "id": "record-uuid",
                 "session_id": "user123",
@@ -265,7 +280,7 @@ class ThreadRepository:
                 "created_at": "2024-01-01 12:00:00"
             }
         """
-        conn = get_sql_lite_instance()
+        conn = self._db_provider.get_connection()
         cur = conn.cursor()
         cur.execute(
             """
@@ -279,8 +294,7 @@ class ThreadRepository:
         row = cur.fetchone()
         return dict(row) if row else None
 
-    @staticmethod
-    def delete_by_session_and_thread(session_id: str, thread_id: str) -> int:
+    def delete_by_session_and_thread(self, session_id: str, thread_id: str) -> int:
         """Delete a specific thread mapping.
         
         Removes the thread record that matches both session ID and thread ID.
@@ -295,13 +309,13 @@ class ThreadRepository:
             int: Number of rows deleted (0 or 1)
             
         Example:
-            >>> ThreadRepository.delete_by_session_and_thread("user123", "thread-uuid")
+            >>> thread_repo.delete_by_session_and_thread("user123", "thread-uuid")
             1  # Successfully deleted
             
-            >>> ThreadRepository.delete_by_session_and_thread("user123", "nonexistent")
+            >>> thread_repo.delete_by_session_and_thread("user123", "nonexistent")
             0  # Nothing to delete
         """
-        conn = get_sql_lite_instance()
+        conn = self._db_provider.get_connection()
         cur = conn.cursor()
         cur.execute(
             "DELETE FROM session_threads WHERE session_id = ? AND thread_id = ?",
@@ -310,8 +324,7 @@ class ThreadRepository:
         conn.commit()
         return cur.rowcount
 
-    @staticmethod
-    def rename_thread_label(session_id: str, thread_id: str, label: str) -> int:
+    def rename_thread_label(self, session_id: str, thread_id: str, label: str) -> int:
         """Update the label for a specific thread.
         
         Changes the display label for a thread identified by session ID and thread ID.
@@ -326,17 +339,17 @@ class ThreadRepository:
             int: Number of rows updated (0 or 1)
             
         Example:
-            >>> ThreadRepository.rename_thread_label("user123", "thread-uuid", "New Label")
+            >>> thread_repo.rename_thread_label("user123", "thread-uuid", "New Label")
             1  # Successfully updated
             
-            >>> ThreadRepository.rename_thread_label("user123", "nonexistent", "Label")
+            >>> thread_repo.rename_thread_label("user123", "nonexistent", "Label")
             0  # Nothing to update
             
         Note:
             This method updates the thread_label field only. Other thread
             properties remain unchanged.
         """
-        conn = get_sql_lite_instance()
+        conn = self._db_provider.get_connection()
         cur = conn.cursor()
         cur.execute(
             """

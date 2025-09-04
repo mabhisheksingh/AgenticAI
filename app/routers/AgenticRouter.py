@@ -2,26 +2,38 @@
 
 This module defines the REST API endpoints for chat interactions with AI agents,
 including streaming chat responses and conversation management.
+
+Uses dependency injection following DIP principles.
 """
 from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Header
+from fastapi import APIRouter, Body, Header, Depends
 from fastapi.responses import StreamingResponse
 
 from app.core.enums import RouterTag
 from app.schemas.ChatRequest import ChatRequest
-from app.services.AgentService import AgentService
+from app.services import AgentServiceInterface
+from app.core.di_container import inject
 
 agentic_router = APIRouter(prefix="/agent", tags=[RouterTag.agent.value])
-agent_service = AgentService()
+
+
+def get_agent_service() -> AgentServiceInterface:
+    """Dependency injection for AgentService.
+    
+    Returns:
+        AgentServiceInterface: Injected agent service instance
+    """
+    return inject(AgentServiceInterface)
 
 
 @agentic_router.post("/chat")
 async def create_and_update_chat(
     user_id: str = Header(...),
     body: ChatRequest = Body(...),
+    agent_service: AgentServiceInterface = Depends(get_agent_service),
 ) -> StreamingResponse:
     """Create or continue a chat conversation with an AI agent.
     
