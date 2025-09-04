@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 import json
 import logging
-from typing import Any, List
+from typing import Any
 import uuid
 from uuid import UUID
 
@@ -14,7 +14,7 @@ from langgraph.graph import MessagesState, StateGraph
 from langgraph.types import StateSnapshot
 
 from app.agents.LLMFactory import LLMFactory
-from app.config.SqlLiteConfig import get_sql_lite_instance, DB_PATH
+from app.config.SqlLiteConfig import get_sql_lite_instance
 from app.repositories.ThreadRepository import ThreadRepository
 
 # Setup logging
@@ -57,7 +57,6 @@ class LangGraphService:
         # Ensure we append the generated AIMessage to the messages list
         return {"messages": [self.llm.invoke(state["messages"])]}
 
-
     def prepare_state_graph(self) -> StateGraph:
         """Build standard LangGraph for hybrid approach."""
         builder = StateGraph(MessagesState)
@@ -65,7 +64,6 @@ class LangGraphService:
         builder.add_edge(START, "chat_model")
         builder.add_edge("chat_model", END)
         return builder
-
 
     def get_thread_by_id_async(self, thread_id: UUID, user_id: str) -> StateSnapshot:
         """Get thread state using sync operations for now."""
@@ -87,7 +85,6 @@ class LangGraphService:
         logger.info("Message: %s", message)
         chat_messages = self.load_and_update_thread(thread_id, user_id, thread_label)
         logger.info("Chat Messages: %s", chat_messages)
-
 
         # if is_new_thread:
         #     thread_id = uuid.uuid4()
@@ -134,29 +131,27 @@ class LangGraphService:
         yield f"data: {json.dumps({'threadId': str(thread_id), 'userId': user_id})}\n\n"
 
         # Pure LangGraph approach: Use LangGraph's astream for workflow-native streaming
-        
+
         try:
             # Use the existing streaming graph (sync version works with stream_mode="messages")
             config = LangGraphService._get_session_and_thread_config(thread_id, user_id)
-            
+
             # Stream through LangGraph's native streaming system with messages mode
             for chunk in self.graph.stream(
-                {"messages": chat_messages}, 
-                config,
-                stream_mode="messages"
+                {"messages": chat_messages}, config, stream_mode="messages"
             ):
                 logger.info(f"Pure LangGraph chunk: {chunk}")
-                
+
                 # Handle the tuple format: (AIMessageChunk, metadata)
                 if isinstance(chunk, tuple) and len(chunk) == 2:
                     message_chunk, metadata = chunk
-                    if hasattr(message_chunk, 'content') and message_chunk.content:
+                    if hasattr(message_chunk, "content") and message_chunk.content:
                         content = message_chunk.content
-                        node_name = metadata.get('langgraph_node', 'unknown')
+                        node_name = metadata.get("langgraph_node", "unknown")
                         logger.info(f">>> Pure LangGraph streaming token: '{content}'")
                         # Send properly formatted SSE data for each token
                         yield f"data: {json.dumps({'type': 'token', 'content': content, 'metadata': {'node': node_name, 'approach': 'pure_langgraph'}})}\n\n"
-                elif hasattr(chunk, 'content') and chunk.content:
+                elif hasattr(chunk, "content") and chunk.content:
                     # Direct AIMessageChunk object
                     content = chunk.content
                     logger.info(f">>> Pure LangGraph streaming token: '{content}'")
@@ -172,7 +167,9 @@ class LangGraphService:
         # End of stream marker
         yield "data: [DONE]\n\n"
 
-    def load_and_update_thread(self, thread_id: UUID, user_id: str, thread_label: str) -> List[BaseMessage]:
+    def load_and_update_thread(
+        self, thread_id: UUID, user_id: str, thread_label: str
+    ) -> list[BaseMessage]:
         chat_messages = []
         is_new_thread = thread_id is None
         if is_new_thread:
