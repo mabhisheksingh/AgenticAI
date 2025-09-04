@@ -20,12 +20,55 @@ logger = logging.getLogger(__name__)
 
 @user_router.get("/get-all")
 async def get_user() -> dict[str, Any]:
+    """
+    Retrieve all user IDs in the system.
+    
+    Returns a list of all unique user IDs that have created threads.
+    This endpoint is useful for user management and admin interfaces.
+    
+    Returns:
+        dict[str, Any]: Standard response envelope containing:
+            - success: True
+            - data: List of user ID strings
+            - meta: None
+            
+    Example Response:
+        {
+            "success": true,
+            "data": ["user-123", "admin", "alice"],
+            "meta": null
+        }
+    """
     logger.info("Getting user called")
     return ok(user_service.get_all_user())
 
 
 @user_router.delete("/{user_id}")
 async def delete_user_by_id(user_id: str) -> dict:
+    """
+    Delete a user and all associated threads.
+    
+    This endpoint removes a user completely from the system, including
+    all their conversation threads and related data.
+    
+    Args:
+        user_id (str): The unique identifier of the user to delete
+        
+    Returns:
+        dict: Standard response envelope containing:
+            - success: True
+            - data: Object with deletion status
+                - deleted: Boolean indicating if deletion occurred
+                - affected: Number of records deleted
+            - meta: None
+            
+    Example Response:
+        {
+            "success": true,
+            "data": {"deleted": true, "affected": 5},
+            "meta": null
+        }
+    """
     logger.info("Getting user called")
     affected = user_service.delete_user_by_id(user_id)
     return ok({"deleted": affected > 0, "affected": affected})
@@ -36,6 +79,39 @@ async def delete_user_by_id(user_id: str) -> dict:
 def list_threads_by_session(
     user_id: Annotated[str, Header(...)],
 ) -> dict[str, Any]:
+    """
+    List all conversation threads for a specific user.
+    
+    Retrieves all threads associated with the user identified by the user-id header.
+    Each thread includes metadata such as creation time and thread label.
+    
+    Headers:
+        user-id (str): The unique identifier of the user whose threads to retrieve
+        
+    Returns:
+        dict[str, Any]: Standard response envelope containing:
+            - success: True
+            - data: List of thread objects, each containing:
+                - thread_id: Unique thread identifier (UUID)
+                - thread_label: Human-readable thread name
+                - created_at: Thread creation timestamp
+                - session_id: Associated user session
+            - meta: None
+            
+    Example Response:
+        {
+            "success": true,
+            "data": [
+                {
+                    "thread_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "thread_label": "Planning Meeting",
+                    "created_at": "2024-01-15T10:30:00Z",
+                    "session_id": "user-123"
+                }
+            ],
+            "meta": null
+        }
+    """
     rows = user_service.list_threads_by_session(user_id)
     return ok(rows)
 
@@ -64,5 +140,41 @@ def rename_thread_label(
     label: Annotated[str, Query()],
     user_id: Annotated[str, Header(...)],
 ) -> dict[str, Any]:
+    """
+    Update the label/name of a conversation thread.
+    
+    Allows users to rename their conversation threads with custom labels
+    for better organization and identification.
+    
+    Query Parameters:
+        threadId (UUID): The unique identifier of the thread to rename
+        label (str): The new label/name for the thread
+        
+    Headers:
+        user-id (str): The unique identifier of the user who owns the thread
+        
+    Returns:
+        dict[str, Any]: Standard response envelope containing:
+            - success: True
+            - data: Object with rename operation status
+                - renamed: Boolean indicating if rename was successful
+                - affected: Number of records updated (should be 1 if successful)
+            - meta: None
+            
+    Example Request:
+        PATCH /v1/user/rename-thread-label?threadId=550e8400-e29b-41d4-a716-446655440000&label=My%20Chat
+        Headers: user-id: user-123
+        
+    Example Response:
+        {
+            "success": true,
+            "data": {"renamed": true, "affected": 1},
+            "meta": null
+        }
+        
+    Error Cases:
+        - Thread not found: Returns success=true, renamed=false, affected=0
+        - Thread belongs to different user: Returns success=true, renamed=false, affected=0
+    """
     affected = user_service.rename_thread_label(user_id, str(threadId), label)
     return ok({"renamed": affected > 0, "affected": affected})
