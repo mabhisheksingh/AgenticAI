@@ -22,7 +22,11 @@ export default function App() {
   
   // UI state
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [thread_id, setThread_id] = useState(() => localStorage.getItem('thread_id'));
+  const [thread_id, setThread_id] = useState(() => {
+    const stored = localStorage.getItem('thread_id');
+    // Ensure we return null for invalid/empty values
+    return stored && stored !== 'null' && stored !== 'undefined' ? stored : null;
+  });
 
   // Custom hooks
   const {

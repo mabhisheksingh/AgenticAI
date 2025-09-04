@@ -103,6 +103,7 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
             thread_repository: Repository for thread management
             db_provider: Database connection provider
         """
+        self.thread_id = None
         self._llm_provider = llm_provider
         self._thread_repository = thread_repository
         self._db_provider = db_provider
@@ -218,7 +219,7 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
         state = self.graph.get_state(config)
         return state
 
-    async def execute_agent(
+    def execute_agent(
         self,
         message: str,
         thread_id: UUID | None,
@@ -247,10 +248,20 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
         4. Format responses as SSE events
         5. Handle errors gracefully
         """
+        return self._execute_agent_impl(message, thread_id, user_id, thread_label)
+    
+    async def _execute_agent_impl(
+        self,
+        message: str,
+        thread_id: UUID | None,
+        user_id: str,
+        thread_label: str,
+    ) -> AsyncGenerator[str, None]:
         logger.info("Pure LangGraph approach: Starting agent execution")
         
         # Load thread history and update with new message
-        chat_messages = self.load_and_update_thread(thread_id, user_id, thread_label)
+        chat_messages, actual_thread_id = self.load_and_update_thread(thread_id, user_id, thread_label)
+        thread_id = actual_thread_id  # Use the actual thread_id (might be newly created)
         
         # Add the new user message
         chat_messages.append(HumanMessage(content=message))
@@ -294,7 +305,7 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
 
     def load_and_update_thread(
         self, thread_id: UUID | None, user_id: str, thread_label: str
-    ) -> list[BaseMessage]:
+    ) -> tuple[list[BaseMessage], UUID]:
         """Load or create conversation thread with message history.
         
         Handles both new thread creation and existing thread loading,
@@ -306,7 +317,7 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
             thread_label (str): Label for the thread (required for new threads)
             
         Returns:
-            list[BaseMessage]: Conversation messages for the thread
+            tuple[list[BaseMessage], UUID]: Conversation messages and thread ID
             
         Side Effects:
             - For new threads: Updates thread_id parameter and saves to ThreadRepository
@@ -379,4 +390,4 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
                     )
                 )
 
-        return chat_messages
+        return chat_messages, thread_id

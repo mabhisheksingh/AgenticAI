@@ -96,7 +96,7 @@ const ChatInput = ({ onSendMessage, loading, disabled, isNewThread = false }) =>
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask something..."
+            placeholder={disabled ? "Please select a user first..." : "Ask something..."}
             disabled={loading || disabled}
             variant="outlined"
             size="medium"
