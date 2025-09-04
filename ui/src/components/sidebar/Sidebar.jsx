@@ -8,6 +8,7 @@ import {
   alpha,
 } from '@mui/material';
 import ThreadList from './ThreadList';
+import ThemeToggle from '../ui/ThemeToggle';
 
 const Sidebar = ({
   open,
@@ -41,23 +42,28 @@ const Sidebar = ({
           zIndex: 1,
         }}
       >
-        <Box display="flex" alignItems="center" gap={1}>
-          <Typography variant="h6" color="text.primary">
-            Chat History
-          </Typography>
-          {threads.length > 0 && (
-            <Chip
-              label={threads.length}
-              size="small"
-              sx={{
-                height: 20,
-                fontSize: '0.75rem',
-                fontWeight: 500,
-                backgroundColor: (theme) => alpha(theme.palette.text.secondary, 0.1),
-                color: 'text.secondary',
-              }}
-            />
-          )}
+        <Box display="flex" alignItems="center" justifyContent="space-between">
+          <Box display="flex" alignItems="center" gap={1}>
+            <Typography variant="h6" color="text.primary">
+              Chat History
+            </Typography>
+            {threads.length > 0 && (
+              <Chip
+                label={threads.length}
+                size="small"
+                sx={{
+                  height: 20,
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  backgroundColor: (theme) => alpha(theme.palette.text.secondary, 0.1),
+                  color: 'text.secondary',
+                }}
+              />
+            )}
+          </Box>
+          
+          {/* Theme Toggle in Sidebar */}
+          <ThemeToggle variant="icon-only" />
         </Box>
       </Box>
 

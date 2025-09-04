@@ -30,7 +30,10 @@ const MessageBubble = ({ message, isLoading = false }) => {
             elevation={0}
             sx={{
               p: 2,
-              backgroundColor: 'grey.50',
+              backgroundColor: (theme) => 
+                theme.palette.mode === 'dark' 
+                  ? 'rgba(255, 255, 255, 0.05)'
+                  : 'grey.50',
               border: '1px solid',
               borderColor: 'divider',
               display: 'flex',
@@ -95,6 +98,18 @@ const MessageBubble = ({ message, isLoading = false }) => {
             borderColor: isUser ? 'primary.200' : 'divider',
             whiteSpace: 'pre-wrap',
             wordWrap: 'break-word',
+            ...(isUser && {
+              backgroundColor: (theme) => 
+                theme.palette.mode === 'dark' 
+                  ? 'rgba(26, 115, 232, 0.15)'
+                  : 'rgba(26, 115, 232, 0.08)',
+            }),
+            ...(!isUser && {
+              backgroundColor: (theme) => 
+                theme.palette.mode === 'dark' 
+                  ? 'rgba(255, 255, 255, 0.05)'
+                  : 'rgba(0, 0, 0, 0.02)',
+            }),
           }}
         >
           <Typography variant="body1">

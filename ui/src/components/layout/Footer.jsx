@@ -1,12 +1,15 @@
 import React from 'react';
 import { Box, Typography, Link, alpha } from '@mui/material';
+import ThemeToggle from '../ui/ThemeToggle';
 
 const Footer = () => {
   return (
     <Box
       component="footer"
       sx={{
-        textAlign: 'center',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         py: 1,
         px: 2,
         borderTop: 1,
@@ -27,6 +30,9 @@ const Footer = () => {
         </Link>
         {' '} | UI via Vite
       </Typography>
+      
+      {/* Additional Theme Toggle in Footer */}
+      <ThemeToggle variant="switch" />
     </Box>
   );
 };

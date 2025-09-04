@@ -16,6 +16,7 @@ import {
   Add,
   Refresh,
 } from '@mui/icons-material';
+import ThemeToggle from '../ui/ThemeToggle';
 
 const TopBar = ({
   sidebarOpen,
@@ -69,6 +70,9 @@ const TopBar = ({
 
         {/* Controls */}
         <Box display="flex" alignItems="center" gap={1.5}>
+          {/* Theme Toggle */}
+          <ThemeToggle variant="icon-only" />
+          
           <Box display="flex" alignItems="center" gap={1}>
             <Chip
               label="User ID"

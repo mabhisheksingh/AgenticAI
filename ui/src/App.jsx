@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ThemeProvider, CssBaseline, Box } from '@mui/material';
-import { theme } from './theme/theme';
+import { Box } from '@mui/material';
+import { ThemeContextProvider } from './contexts/ThemeContext';
 
 // Components
 import TopBar from './components/layout/TopBar';
@@ -110,8 +110,7 @@ export default function App() {
   const threadTitle = currentThread?.thread_label || currentThread?.title || null;
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    <ThemeContextProvider>
       <ErrorBoundary>
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
           {/* Top Bar */}
@@ -173,6 +172,6 @@ export default function App() {
           <Footer />
         </Box>
       </ErrorBoundary>
-    </ThemeProvider>
+    </ThemeContextProvider>
   );
 }
