@@ -6,6 +6,8 @@ A production-ready full-stack application featuring a **FastAPI backend** and **
 
 ### Backend (FastAPI)
 - **Versioned REST API** with centralized routing (`/v1/*`)
+- **Spring MVC Architecture** with interface-implementation separation
+- **Dependency Injection Container** following DIP principles
 - **Multiple LLM Support** (Ollama, Google Gemini) via factory pattern
 - **LangGraph Integration** for agent orchestration with checkpointing
 - **SQLite Persistence** with thread management
@@ -70,18 +72,30 @@ app/
   │   ├── errors.py             # AppError, NotFoundError, ApiErrorItem
   │   ├── exception_handlers.py # Global error handling
   │   ├── middleware.py         # CorrelationID, Request logging
-  │   └── response.py           # ok(), error(), paginate() helpers
-  ├── agents/                   # AI/LLM integration
-  │   └── LLMFactory.py         # Factory for Ollama/Gemini LLMs
+  │   ├── response.py           # ok(), error(), paginate() helpers
+  │   └── di_container.py       # Dependency injection container
+  ├── services/                 # Service layer (Spring MVC pattern)
+  │   ├── __init__.py           # Interface exports
+  │   ├── agent_service_interface.py    # Agent service contracts
+  │   ├── user_service_interface.py     # User service contracts
+  │   └── impl/                 # Service implementations
+  │       ├── agent_service_impl.py     # Agent service implementation
+  │       ├── user_service_impl.py      # User service implementation
+  │       └── langgraph_service_impl.py # LangGraph orchestration
+  ├── repositories/             # Repository layer (Spring MVC pattern)
+  │   ├── __init__.py           # Interface exports
+  │   ├── thread_repository_interface.py    # Repository contracts
+  │   ├── database_interface.py             # Database contracts
+  │   └── impl/                 # Repository implementations
+  │       └── thread_repository_impl.py    # Thread/session CRUD
+  ├── agents/                   # AI/LLM integration (Spring MVC pattern)
+  │   ├── __init__.py           # Interface exports
+  │   ├── llm_provider_interface.py     # LLM provider contracts
+  │   └── impl/                 # Agent implementations
+  │       └── llm_factory_impl.py       # Factory for Ollama/Gemini LLMs
   ├── routers/                  # API endpoint routers
   │   ├── UserRouter.py         # /v1/user/* endpoints
   │   └── AgenticRouter.py      # /v1/agent/* endpoints
-  ├── services/                 # Business logic layer
-  │   ├── UserService.py        # User management logic
-  │   ├── AgentService.py       # Chat/agent orchestration
-  │   └── LangGraphService.py   # LangGraph integration
-  ├── repositories/             # Data access layer
-  │   └── ThreadRepository.py   # Thread/session CRUD operations
   ├── schemas/                  # Pydantic models
   │   ├── ChatRequest.py        # Chat request/response schemas
   │   └── chat.py               # Additional chat schemas
@@ -94,6 +108,40 @@ app/
   └── db/                       # Database files
       └── chat.db               # SQLite database
 ```
+
+#### Spring MVC Package Structure
+
+The backend follows **Spring MVC conventions** for clean separation of concerns:
+
+**Interface-Implementation Pattern:**
+- **Interfaces** are located in main packages (`services/`, `repositories/`, `agents/`)
+- **Implementations** are organized in `impl/` subfolders
+- **Dependency Injection** connects interfaces to implementations
+
+**Package Organization:**
+```python
+# Import interfaces from main packages
+from app.services import AgentServiceInterface, UserServiceInterface
+from app.repositories import ThreadRepositoryInterface, DatabaseConnectionProvider
+from app.agents import LLMProviderInterface
+
+# Implementations are accessed through DI container
+from app.core.di_container import inject
+agent_service = inject(AgentServiceInterface)
+```
+
+**Benefits of This Structure:**
+- **Interface Segregation Principle (ISP)**: Clean, focused interfaces
+- **Dependency Inversion Principle (DIP)**: High-level modules depend on abstractions
+- **Testability**: Easy to mock dependencies for unit testing
+- **Maintainability**: Clear separation between contracts and implementations
+- **Spring MVC Familiarity**: Java/Spring developers will find this structure familiar
+
+**Layer Responsibilities:**
+- **Services Layer**: Business logic and orchestration
+- **Repository Layer**: Data access and persistence
+- **Agents Layer**: AI/LLM provider abstraction
+- **Routers Layer**: HTTP endpoint handling and request routing
 
 ### Frontend Structure
 ```
@@ -744,13 +792,21 @@ The following modules have comprehensive documentation:
 #### Utilities (`app/utils/`)
 - **`text.py`**: Content extraction and text processing utilities
 
-#### Repository Layer (`app/repositories/`)
-- **`ThreadRepository.py`**: Thread and session data access methods
-
 #### Service Layer (`app/services/`)
-- **`AgentService.py`**: High-level agent interaction coordination
-- **`LangGraphService.py`**: LangGraph workflow orchestration
-- **`UserService.py`**: User management business logic
+- **`agent_service_interface.py`**: Agent service contracts (AgentServiceInterface, AgentExecutionInterface, ConversationStateInterface)
+- **`user_service_interface.py`**: User management service contracts
+- **`impl/agent_service_impl.py`**: High-level agent interaction coordination
+- **`impl/langgraph_service_impl.py`**: LangGraph workflow orchestration
+- **`impl/user_service_impl.py`**: User management business logic
+
+#### Repository Layer (`app/repositories/`)
+- **`thread_repository_interface.py`**: Thread and session data access contracts
+- **`database_interface.py`**: Database connection provider contracts
+- **`impl/thread_repository_impl.py`**: Thread and session data access implementation
+
+#### Agents Layer (`app/agents/`)
+- **`llm_provider_interface.py`**: LLM provider abstraction contracts
+- **`impl/llm_factory_impl.py`**: Factory implementation for Ollama/Gemini LLMs
 
 #### API Layer (`app/routers/`)
 - **`AgenticRouter.py`**: AI agent and chat endpoints
@@ -769,14 +825,63 @@ The following modules have comprehensive documentation:
 #### Code Documentation
 ```bash
 # View module documentation
-python -c "import app.services.AgentService; help(app.services.AgentService)"
+python -c "import app.services; help(app.services)"
 
-# View specific class documentation
-python -c "from app.services.LangGraphService import LangGraphService; help(LangGraphService)"
+# View specific interface documentation
+python -c "from app.services import AgentServiceInterface; help(AgentServiceInterface)"
 
-# View function documentation
-python -c "from app.core.response import ok; help(ok)"
+# View implementation documentation
+python -c "from app.services.impl.langgraph_service_impl import LangGraphServiceImpl; help(LangGraphServiceImpl)"
 ```
+
+### Import Structure Changes
+
+#### New Simplified Import Pattern (Post Spring MVC Reorganization)
+
+With the Spring MVC structure, imports are significantly cleaner:
+
+**Before (Old Structure):**
+```python
+# Old complex import paths
+from app.services.interfaces.agent_service_interface import AgentServiceInterface
+from app.repositories.interfaces.thread_repository_interface import ThreadRepositoryInterface
+from app.agents.interfaces.llm_provider_interface import LLMProviderInterface
+```
+
+**After (Spring MVC Structure):**
+```python
+# New clean import paths
+from app.services import AgentServiceInterface, UserServiceInterface
+from app.repositories import ThreadRepositoryInterface, DatabaseConnectionProvider
+from app.agents import LLMProviderInterface
+```
+
+**Package [__init__.py](file:///Users/abhishek/Desktop/Coding/AgenticAI/app/__init__.py) Files:**
+Each main package re-exports its interfaces for clean imports:
+
+```python
+# app/services/__init__.py
+from .agent_service_interface import (
+    AgentServiceInterface,
+    AgentExecutionInterface,
+    ConversationStateInterface,
+)
+from .user_service_interface import UserServiceInterface
+
+__all__ = [
+    "AgentServiceInterface",
+    "AgentExecutionInterface", 
+    "ConversationStateInterface",
+    "UserServiceInterface",
+]
+```
+
+**Benefits of New Import Structure:**
+- **Cleaner Code**: Shorter, more readable import statements
+- **Spring MVC Compliance**: Follows Java/Spring naming conventions
+- **Better IDE Support**: Autocomplete works better with main package imports
+- **Easier Refactoring**: Changes to implementations don't affect import statements
+- **Consistent Pattern**: All interfaces imported from main packages
 
 #### IDE Integration
 Most modern IDEs will automatically display docstrings when hovering over functions or classes:
@@ -1224,6 +1329,26 @@ lsof -p $(pgrep -f "python.*app.main")
 
 #### Import and Module Issues
 
+**Issue**: Module import errors after Spring MVC reorganization
+
+**Solutions**:
+1. **Use new import structure**:
+   ```python
+   # New correct imports
+   from app.services import AgentServiceInterface
+   from app.repositories import ThreadRepositoryInterface
+   from app.agents import LLMProviderInterface
+   
+   # Avoid old import paths
+   # from app.services.interfaces.agent_service_interface import AgentServiceInterface  # OLD
+   ```
+
+2. **Check [__init__.py](file:///Users/abhishek/Desktop/Coding/AgenticAI/app/__init__.py) files exist**:
+   ```bash
+   find app/ -name "__init__.py" | head -10
+   # Should show __init__.py files in all packages
+   ```
+
 **Issue**: Circular import errors
 
 **Solutions**:
@@ -1321,8 +1446,14 @@ curl http://localhost:8080/docs
 # Database connectivity
 python -c "from app.config.SqlLiteConfig import get_sql_lite_instance; print('DB OK')"
 
-# LLM connectivity
-python -c "from app.agents.LLMFactory import LLMFactory; LLMFactory.create(); print('LLM OK')"
+# LLM connectivity 
+python -c "from app.agents.impl.llm_factory_impl import LLMFactoryImpl; LLMFactoryImpl().create_model(); print('LLM OK')"
+
+# Dependency injection health
+python -c "from app.core.di_container import inject; from app.services import AgentServiceInterface; inject(AgentServiceInterface); print('DI OK')"
+
+# New import structure verification
+python -c "from app.services import AgentServiceInterface; from app.repositories import ThreadRepositoryInterface; from app.agents import LLMProviderInterface; print('Imports OK')"
 ```
 
 #### Common Log Patterns

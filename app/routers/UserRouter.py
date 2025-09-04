@@ -1,14 +1,30 @@
+"""API router for user management endpoints.
+
+This module defines the REST API endpoints for user and thread management,
+including user retrieval, deletion, and thread operations.
+
+Uses dependency injection following DIP principles.
+"""
 import logging
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Header, Query
+from fastapi import APIRouter, Header, Query, Depends
 
 from app.core.response import ok
-from app.services.UserService import UserService
+from app.services import UserServiceInterface
+from app.core.di_container import inject
 
 user_router = APIRouter(prefix="/user", tags=["user"])
-user_service = UserService()
+
+
+def get_user_service() -> UserServiceInterface:
+    """Dependency injection for UserService.
+    
+    Returns:
+        UserServiceInterface: Injected user service instance
+    """
+    return inject(UserServiceInterface)
 
 # Setup logging
 logging.basicConfig(
@@ -19,7 +35,9 @@ logger = logging.getLogger(__name__)
 
 
 @user_router.get("/get-all")
-async def get_user() -> dict[str, Any]:
+async def get_user(
+    user_service: UserServiceInterface = Depends(get_user_service),
+) -> dict[str, Any]:
     """
     Retrieve all user IDs in the system.
     
@@ -40,11 +58,14 @@ async def get_user() -> dict[str, Any]:
         }
     """
     logger.info("Getting user called")
-    return ok(user_service.get_all_user())
+    return ok(user_service.get_all_users())
 
 
 @user_router.delete("/{user_id}")
-async def delete_user_by_id(user_id: str) -> dict:
+async def delete_user_by_id(
+    user_id: str,
+    user_service: UserServiceInterface = Depends(get_user_service),
+) -> dict:
     """
     Delete a user and all associated threads.
     
@@ -69,8 +90,8 @@ async def delete_user_by_id(user_id: str) -> dict:
             "meta": null
         }
     """
-    logger.info("Getting user called")
-    affected = user_service.delete_user_by_id(user_id)
+    logger.info("Deleting user called")
+    affected = user_service.delete_user(user_id)
     return ok({"deleted": affected > 0, "affected": affected})
 
 
@@ -78,6 +99,7 @@ async def delete_user_by_id(user_id: str) -> dict:
 @user_router.get("/threads")
 def list_threads_by_session(
     user_id: Annotated[str, Header(...)],
+    user_service: UserServiceInterface = Depends(get_user_service),
 ) -> dict[str, Any]:
     """
     List all conversation threads for a specific user.
@@ -120,6 +142,7 @@ def list_threads_by_session(
 def get_thread_by_id(
     thread_id: UUID,
     user_id: Annotated[str, Header(...)],
+    user_service: UserServiceInterface = Depends(get_user_service),
 ) -> dict[str, Any]:
     row = user_service.get_thread_by_id(user_id, thread_id)
     return ok(row)
@@ -129,6 +152,7 @@ def get_thread_by_id(
 def delete_thread_by_session_and_id(
     thread_id: UUID,
     user_id: Annotated[str, Header(...)],
+    user_service: UserServiceInterface = Depends(get_user_service),
 ) -> dict[str, Any]:
     affected = user_service.delete_thread_by_session_and_id(user_id, str(thread_id))
     return ok({"deleted": affected > 0, "affected": affected})
@@ -139,6 +163,7 @@ def rename_thread_label(
     threadId: Annotated[UUID, Query(alias="threadId")],
     label: Annotated[str, Query()],
     user_id: Annotated[str, Header(...)],
+    user_service: UserServiceInterface = Depends(get_user_service),
 ) -> dict[str, Any]:
     """
     Update the label/name of a conversation thread.

@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config.SqlLiteConfig import close_sql_lite_instance
 from app.core.exception_handlers import register_exception_handlers
 from app.core.middleware import CorrelationIdMiddleware, RequestLoggingMiddleware
+from app.core.di_container import configure_dependencies
 from app.dispatch import dispatch_router
 
 load_dotenv()
@@ -17,6 +18,7 @@ def create_app() -> FastAPI:
     Create and configure the FastAPI application.
     
     This function sets up the complete FastAPI application with:
+    - Dependency injection container configuration (DIP)
     - Global exception handlers for standardized error responses
     - CORS middleware for frontend communication
     - Correlation ID middleware for request tracing
@@ -31,6 +33,9 @@ def create_app() -> FastAPI:
         CORS_ORIGINS: Comma-separated list of allowed CORS origins
                      (default: "http://localhost:5173")
     """
+    # Configure dependency injection container first
+    configure_dependencies()
+    
     application = FastAPI(
         title="AgenticAI",
         description="Production-ready FastAPI backend for Agentic AI chat application",
