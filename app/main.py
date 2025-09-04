@@ -13,8 +13,31 @@ load_dotenv()
 
 
 def create_app() -> FastAPI:
-    """Create and configure the FastAPI application."""
-    application = FastAPI(title="AgenticAI")
+    """
+    Create and configure the FastAPI application.
+    
+    This function sets up the complete FastAPI application with:
+    - Global exception handlers for standardized error responses
+    - CORS middleware for frontend communication
+    - Correlation ID middleware for request tracing
+    - Request logging middleware for observability
+    - All API routers with versioned endpoints
+    - Graceful database connection shutdown
+    
+    Returns:
+        FastAPI: Configured FastAPI application instance
+        
+    Environment Variables:
+        CORS_ORIGINS: Comma-separated list of allowed CORS origins
+                     (default: "http://localhost:5173")
+    """
+    application = FastAPI(
+        title="AgenticAI",
+        description="Production-ready FastAPI backend for Agentic AI chat application",
+        version="1.0.0",
+        docs_url="/docs",
+        redoc_url="/redoc"
+    )
     # Controller Advice: register global exception handlers
     register_exception_handlers(application)
 
