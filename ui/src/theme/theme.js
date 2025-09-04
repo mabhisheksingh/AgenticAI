@@ -1,8 +1,9 @@
 import { createTheme } from '@mui/material/styles';
 
-export const theme = createTheme({
+// Create theme function that accepts mode parameter
+export const createAppTheme = (mode = 'light') => createTheme({
   palette: {
-    mode: 'light',
+    mode,
     primary: {
       main: '#1a73e8',
       light: '#4285f4',
@@ -14,14 +15,23 @@ export const theme = createTheme({
       dark: '#c2185b',
     },
     background: {
-      default: '#f6f8fc',
-      paper: '#ffffff',
+      default: mode === 'light' ? '#f6f8fc' : '#121212',
+      paper: mode === 'light' ? '#ffffff' : '#1e1e1e',
     },
     text: {
-      primary: '#1f2937',
-      secondary: '#5f6368',
+      primary: mode === 'light' ? '#1f2937' : '#ffffff',
+      secondary: mode === 'light' ? '#5f6368' : '#b3b3b3',
     },
-    divider: '#e5e7eb',
+    divider: mode === 'light' ? '#e5e7eb' : '#333333',
+    action: {
+      hover: mode === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.08)',
+    },
+    // Custom colors for message bubbles
+    grey: {
+      50: mode === 'light' ? '#f9fafb' : '#18181b',
+      100: mode === 'light' ? '#f3f4f6' : '#27272a',
+      200: mode === 'light' ? '#e5e7eb' : '#3f3f46',
+    },
   },
   typography: {
     fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji"',
@@ -56,6 +66,7 @@ export const theme = createTheme({
         root: {
           '& .MuiOutlinedInput-root': {
             borderRadius: 12,
+            backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
           },
         },
       },
@@ -64,8 +75,20 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
+          backgroundColor: mode === 'dark' ? '#1e1e1e' : '#ffffff',
+        },
+      },
+    },
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          backgroundColor: mode === 'dark' ? '#1e1e1e' : '#ffffff',
+          color: mode === 'dark' ? '#ffffff' : '#1f2937',
         },
       },
     },
   },
 });
+
+// Default light theme for backward compatibility
+export const theme = createAppTheme('light');

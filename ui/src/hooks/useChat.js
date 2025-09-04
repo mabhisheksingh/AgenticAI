@@ -40,6 +40,7 @@ const useChat = (userId, threadId, setThreadId) => {
 
     const controller = new AbortController();
     let aggregated = '';
+    let firstTokenReceived = false; // Track if we've received the first token
 
     try {
       await api.chatStream({
@@ -60,6 +61,13 @@ const useChat = (userId, threadId, setThreadId) => {
             
             // Handle token streaming
             if (obj?.type === 'token' && obj?.content) {
+              // Hide "Thinking..." on first token
+              if (!firstTokenReceived) {
+                firstTokenReceived = true;
+                console.log('First token received, hiding "Thinking..."');
+                setLoading(false);
+              }
+              
               aggregated += obj.content;
               setMessages((prev) =>
                 prev.map((msg) =>
@@ -72,6 +80,12 @@ const useChat = (userId, threadId, setThreadId) => {
             }
           } catch {
             // Handle plain text fallback
+            if (!firstTokenReceived) {
+              firstTokenReceived = true;
+              console.log('First content received (plain text), hiding "Thinking..."');
+              setLoading(false);
+            }
+            
             aggregated += payload;
             setMessages((prev) =>
               prev.map((msg) =>
@@ -81,6 +95,7 @@ const useChat = (userId, threadId, setThreadId) => {
           }
         },
         onDone: () => {
+          // Ensure loading is false when streaming is complete
           setLoading(false);
         },
         onError: (err) => {
@@ -98,12 +113,15 @@ const useChat = (userId, threadId, setThreadId) => {
     } catch (err) {
       setLoading(false);
       setError(err.message || 'Failed to send message');
-      const errorMessage = {
-        id: `error-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        role: 'assistant',
-        text: `Error: ${err.message || 'Unknown error'}`
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      // Remove the placeholder assistant message and show error message
+      setMessages((prev) => [
+        ...prev.filter(msg => msg.id !== assistantId),
+        {
+          id: `error-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          role: 'assistant',
+          text: `Error: ${err.message || 'Unknown error'}`
+        }
+      ]);
     }
   }, [userId, threadId, setThreadId, loading]);
 
