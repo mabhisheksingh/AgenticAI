@@ -57,6 +57,31 @@ class ThreadRepository:
         )
 
     @staticmethod
+    def get_all_user() -> list[str]:
+        conn = get_sql_lite_instance()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT DISTINCT session_id
+            FROM session_threads
+            ORDER BY session_id
+            """
+        )
+        rows = cur.fetchall()
+        return [row[0] for row in rows]
+
+    @staticmethod
+    def delete_user_by_id(user_id: str) -> int:
+        conn = get_sql_lite_instance()
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM session_threads WHERE session_id = ?",
+            (user_id,),
+        )
+        conn.commit()
+        return cur.rowcount
+
+    @staticmethod
     def get_thread_by_id(thread_id: str) -> dict[str, Any] | None:
         conn = get_sql_lite_instance()
         cur = conn.cursor()

@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/controller';
 
-const useThreads = (userId) => {
+const useThreads = (user_id) => {
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const loadThreads = async () => {
-    if (!userId) return;
+    if (!user_id) return;
     
     setLoading(true);
     setError(null);
     
     try {
-      const res = await api.listThreads({ userId });
+      const res = await api.listThreads({ user_id });
       const items = Array.isArray(res?.data) ? res.data : res;
       setThreads(items || []);
     } catch (err) {
@@ -24,9 +24,9 @@ const useThreads = (userId) => {
     }
   };
 
-  const deleteThread = async (threadId) => {
+  const deleteThread = async (thread_id) => {
     try {
-      await api.deleteThread({ userId, threadId });
+      await api.deleteThread({ user_id, thread_id });
       await loadThreads(); // Refresh the list
       return true;
     } catch (err) {
@@ -37,10 +37,10 @@ const useThreads = (userId) => {
 
   const renameThread = async (thread, newLabel) => {
     try {
-      const threadId = thread.thread_id || thread.id;
+      const thread_id = thread.thread_id || thread.id;
       await api.renameThreadLabel({
-        userId,
-        threadId,
+        user_id,
+        thread_id,
         label: newLabel,
       });
       await loadThreads(); // Refresh the list
@@ -51,9 +51,9 @@ const useThreads = (userId) => {
     }
   };
 
-  const loadThreadDetails = async (threadId) => {
+  const loadThreadDetails = async (thread_id) => {
     try {
-      const threadDetails = await api.getThreadDetails({ userId, threadId });
+      const threadDetails = await api.getThreadDetails({ user_id, thread_id });
       return threadDetails?.data?.messages || [];
     } catch (err) {
       setError(err.message || 'Failed to load thread details');
@@ -62,10 +62,17 @@ const useThreads = (userId) => {
   };
 
   useEffect(() => {
-    if (userId) {
+    if (user_id) {
+      // Clear threads first when user changes
+      setThreads([]);
+      setError(null);
       loadThreads();
+    } else {
+      // Clear threads if no user selected
+      setThreads([]);
+      setError(null);
     }
-  }, [userId]);
+  }, [user_id]);
 
   return {
     threads,

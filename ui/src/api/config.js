@@ -15,5 +15,6 @@ export const API_BASE_URL = DIRECT_API_BASE
 export const DEFAULT_TIMEOUT_MS = Number(import.meta.env.VITE_REQUEST_TIMEOUT_MS || 30000)
 
 // Common header keys used by backend
-export const HEADER_USER_ID = 'userId'
-export const HEADER_THREAD_ID = 'threadId'
+// Note: FastAPI converts snake_case parameter names to kebab-case headers
+export const HEADER_USER_ID = 'user-id'
+export const HEADER_THREAD_ID = 'thread-id'

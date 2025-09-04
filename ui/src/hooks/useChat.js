@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { api } from '../api/controller';
 import { generateThreadLabel, validateThreadLabel } from '../utils/threadUtils';
 
-const useChat = (userId, threadId, setThreadId) => {
+const useChat = (user_id, thread_id, setThread_id) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -44,8 +44,8 @@ const useChat = (userId, threadId, setThreadId) => {
 
     try {
       await api.chatStream({
-        userId,
-        threadId,
+        user_id,
+        thread_id,
         message: text,
         threadLabel: generatedThreadLabel, // ALWAYS send thread label (mandatory)
         signal: controller.signal,
@@ -54,8 +54,8 @@ const useChat = (userId, threadId, setThreadId) => {
             const obj = JSON.parse(payload);
             
             // Handle thread ID update
-            if (obj?.threadId && !threadId) {
-              setThreadId(obj.threadId);
+            if (obj?.threadId && !thread_id) {
+              setThread_id(obj.threadId);
               return;
             }
             
@@ -123,7 +123,7 @@ const useChat = (userId, threadId, setThreadId) => {
         }
       ]);
     }
-  }, [userId, threadId, setThreadId, loading]);
+  }, [user_id, thread_id, setThread_id, loading]);
 
   const loadMessages = useCallback((threadMessages) => {
     if (!Array.isArray(threadMessages)) {

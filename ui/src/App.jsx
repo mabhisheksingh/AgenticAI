@@ -16,13 +16,13 @@ import useChat from './hooks/useChat';
 
 export default function App() {
   // User state
-  const [userId, setUserId] = useState(() =>
-    localStorage.getItem('userId') || `user-${Math.random().toString(36).slice(2, 8)}`
+  const [user_id, setUser_id] = useState(() =>
+    localStorage.getItem('user_id') || `user-${Math.random().toString(36).slice(2, 8)}`
   );
   
   // UI state
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [threadId, setThreadId] = useState(() => localStorage.getItem('threadId'));
+  const [thread_id, setThread_id] = useState(() => localStorage.getItem('thread_id'));
 
   // Custom hooks
   const {
@@ -33,7 +33,7 @@ export default function App() {
     deleteThread,
     renameThread,
     loadThreadDetails,
-  } = useThreads(userId);
+  } = useThreads(user_id);
 
   const {
     messages,
@@ -42,28 +42,28 @@ export default function App() {
     sendMessage,
     loadMessages,
     clearMessages,
-  } = useChat(userId, threadId, setThreadId);
+  } = useChat(user_id, thread_id, setThread_id);
 
   // Persist user data
   useEffect(() => {
-    localStorage.setItem('userId', userId);
-  }, [userId]);
+    localStorage.setItem('user_id', user_id);
+  }, [user_id]);
 
   useEffect(() => {
-    if (threadId) {
-      localStorage.setItem('threadId', threadId);
+    if (thread_id) {
+      localStorage.setItem('thread_id', thread_id);
     } else {
-      localStorage.removeItem('threadId');
+      localStorage.removeItem('thread_id');
     }
-  }, [threadId]);
+  }, [thread_id]);
 
   // Handlers
   const handleSelectThread = async (thread) => {
     const id = thread.thread_id || thread.id;
     
-    if (id !== threadId) {
+    if (id !== thread_id) {
       clearMessages();
-      setThreadId(id);
+      setThread_id(id);
       
       try {
         const threadMessages = await loadThreadDetails(id);
@@ -78,8 +78,8 @@ export default function App() {
 
   const handleDeleteThread = async (id) => {
     const success = await deleteThread(id);
-    if (success && threadId === id) {
-      setThreadId(null);
+    if (success && thread_id === id) {
+      setThread_id(null);
       clearMessages();
     }
   };
@@ -89,7 +89,7 @@ export default function App() {
   };
 
   const handleNewThread = () => {
-    setThreadId(null);
+    setThread_id(null);
     clearMessages();
   };
 
@@ -105,8 +105,22 @@ export default function App() {
     }
   };
 
+  const handleUserSelect = async (selectedUser_id) => {
+    if (selectedUser_id && selectedUser_id !== user_id) {
+      // Clear current chat state
+      setThread_id(null);
+      clearMessages();
+      
+      // Update user ID
+      setUser_id(selectedUser_id);
+      
+      // Load threads for the new user will be handled by useThreads hook
+      // when user_id changes, it will automatically reload
+    }
+  };
+
   // Get current thread title
-  const currentThread = threads.find((t) => (t.thread_id || t.id) === threadId);
+  const currentThread = threads.find((t) => (t.thread_id || t.id) === thread_id);
   const threadTitle = currentThread?.thread_label || currentThread?.title || null;
 
   return (
@@ -117,8 +131,9 @@ export default function App() {
           <TopBar
             sidebarOpen={sidebarOpen}
             onToggleSidebar={handleToggleSidebar}
-            userId={userId}
-            onUserIdChange={setUserId}
+            user_id={user_id}
+            onUser_idChange={setUser_id}
+            onUserSelect={handleUserSelect}
             onLoadThreads={loadThreads}
             onNewThread={handleNewThread}
           />
@@ -130,7 +145,7 @@ export default function App() {
               <Sidebar
                 open={sidebarOpen}
                 threads={threads}
-                activeThreadId={threadId}
+                activeThreadId={thread_id}
                 loadingThreads={loadingThreads}
                 onSelectThread={handleSelectThread}
                 onDeleteThread={handleDeleteThread}
@@ -153,7 +168,7 @@ export default function App() {
                   messages={messages}
                   loading={chatLoading}
                   threadTitle={threadTitle}
-                  isNewThread={!threadId}
+                  isNewThread={!thread_id}
                 />
               </ErrorBoundary>
               
@@ -161,8 +176,8 @@ export default function App() {
                 <ChatInput
                   onSendMessage={handleSendMessage}
                   loading={chatLoading}
-                  disabled={!userId}
-                  isNewThread={!threadId}
+                  disabled={!user_id}
+                  isNewThread={!thread_id}
                 />
               </ErrorBoundary>
             </Box>

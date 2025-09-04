@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class ChatRequest(BaseModel):
@@ -14,7 +16,7 @@ class ChatRequest(BaseModel):
         ..., description="Thread label (max 10 words)"
     )  # Made mandatory with validation
 
-    @validator("thread_label")
+    @field_validator("thread_label")
     def validate_thread_label(cls, v):
         if not v or not isinstance(v, str):
             raise ValueError("Thread label must be a non-empty string")
