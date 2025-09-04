@@ -1,7 +1,8 @@
 import logging
-from typing import Any, Annotated, Coroutine
+from typing import Annotated, Any
 from uuid import UUID
-from fastapi import APIRouter,Header, Query
+
+from fastapi import APIRouter, Header, Query
 
 from app.core.response import ok
 from app.services.UserService import UserService
@@ -22,12 +23,12 @@ async def get_user() -> dict[str, Any]:
     logger.info("Getting user called")
     return ok(user_service.get_all_user())
 
+
 @user_router.delete("/{user_id}")
 async def delete_user_by_id(user_id: str) -> dict:
     logger.info("Getting user called")
     affected = user_service.delete_user_by_id(user_id)
     return ok({"deleted": affected > 0, "affected": affected})
-
 
 
 # New endpoints: list and delete threads by session (user)

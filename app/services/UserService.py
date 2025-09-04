@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 from uuid import UUID
-import logging
 
 from app.core.errors import NotFoundError
 from app.repositories.ThreadRepository import ThreadRepository
@@ -10,6 +10,8 @@ from app.services.LangGraphService import LangGraphService
 
 logger = logging.getLogger(__name__)
 langgraph_service = LangGraphService()
+
+
 class UserService:
     def __init__(self):
         pass
@@ -20,10 +22,9 @@ class UserService:
         return all_user
 
     @classmethod
-    def delete_user_by_id(cls,user_id: str) -> int:
+    def delete_user_by_id(cls, user_id: str) -> int:
         status = ThreadRepository.delete_user_by_id(user_id)
         return status
-
 
     @classmethod
     def list_threads_by_session(cls, user_id: str) -> list[dict[str, Any]]:
