@@ -4,20 +4,20 @@ import { HEADER_THREAD_ID, HEADER_USER_ID } from './config'
 
 // Main controller: all API calls defined here
 export const api = {
-  chat: async ({ userId, threadId, message }) => {
-    const headers = { [HEADER_USER_ID]: userId }
-    if (threadId) headers[HEADER_THREAD_ID] = threadId
+  chat: async ({ user_id, thread_id, message }) => {
+    const headers = { [HEADER_USER_ID]: user_id }
+    if (thread_id) headers[HEADER_THREAD_ID] = thread_id
     const res = await http.post(Endpoints.chat, { message }, { headers })
     return res.data
   },
   // Streaming chat over SSE (POST)
-  // Usage: api.chatStream({ userId, threadId, message, threadLabel, onEvent, onDone, onError })
-  chatStream: async ({ userId, threadId, message, threadLabel, onEvent, onDone, onError, signal }) => {
+  // Usage: api.chatStream({ user_id, thread_id, message, threadLabel, onEvent, onDone, onError })
+  chatStream: async ({ user_id, thread_id, message, threadLabel, onEvent, onDone, onError, signal }) => {
     const url = http.buildUrl(Endpoints.chat)
     const headers = {
       'Content-Type': 'application/json',
       'Accept': 'text/event-stream',
-      [HEADER_USER_ID]: userId,
+      [HEADER_USER_ID]: user_id,
     }
     
     // Ensure threadLabel is always provided - it's now mandatory
@@ -27,8 +27,8 @@ export const api = {
     
     // Build request body with message, optional thread_id, and mandatory thread_label
     const requestBody = { message, thread_label: threadLabel }
-    if (threadId) {
-      requestBody.thread_id = threadId
+    if (thread_id) {
+      requestBody.thread_id = thread_id
     }
 
     const res = await fetch(url, {
@@ -79,34 +79,40 @@ export const api = {
       try { reader.releaseLock() } catch {}
     }
   },
-  listThreads: async ({ userId }) => {
-    const headers = { [HEADER_USER_ID]: userId }
+  listThreads: async ({ user_id }) => {
+    const headers = { [HEADER_USER_ID]: user_id }
     const res = await http.get(Endpoints.threads, { headers })
     return res.data
   },
-  deleteThread: async ({ userId, threadId }) => {
-    const headers = { [HEADER_USER_ID]: userId }
-    const res = await http.delete(Endpoints.deleteThread(threadId), { headers })
+  deleteThread: async ({ user_id, thread_id }) => {
+    const headers = { [HEADER_USER_ID]: user_id }
+    const res = await http.delete(Endpoints.deleteThread(thread_id), { headers })
     return res.data
   },
-  renameThreadLabel: async ({ userId, threadId, label }) => {
+  renameThreadLabel: async ({ user_id, thread_id, label }) => {
     const headers = { 
-      [HEADER_USER_ID]: userId,
+      [HEADER_USER_ID]: user_id,
       'accept': 'application/json'
     }
     const res = await http.patch(
-      Endpoints.renameThreadLabel(threadId, label),
+      Endpoints.renameThreadLabel(thread_id, label),
       null,
       { headers }
     )
     return res.data
   },
-  getThreadDetails: async ({ userId, threadId }) => {
+  getThreadDetails: async ({ user_id, thread_id }) => {
     const headers = { 
-      [HEADER_USER_ID]: userId,
+      [HEADER_USER_ID]: user_id,
       'accept': 'application/json'
     }
-    const res = await http.get(Endpoints.threadDetails(threadId), { headers })
+    const res = await http.get(Endpoints.threadDetails(thread_id), { headers })
+    return res.data
+  },
+  
+  // Get all users
+  getAllUsers: async () => {
+    const res = await http.get(Endpoints.getAllUsers)
     return res.data
   },
 }

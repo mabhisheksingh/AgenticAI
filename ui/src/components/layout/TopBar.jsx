@@ -17,12 +17,14 @@ import {
   Refresh,
 } from '@mui/icons-material';
 import ThemeToggle from '../ui/ThemeToggle';
+import UserSelector from '../ui/UserSelector';
 
 const TopBar = ({
   sidebarOpen,
   onToggleSidebar,
-  userId,
-  onUserIdChange,
+  user_id,
+  onUser_idChange,
+  onUserSelect,
   onLoadThreads,
   onNewThread,
 }) => {
@@ -74,24 +76,10 @@ const TopBar = ({
           <ThemeToggle variant="icon-only" />
           
           <Box display="flex" alignItems="center" gap={1}>
-            <Chip
-              label="User ID"
-              size="small"
-              variant="outlined"
-              sx={{ fontSize: '0.75rem' }}
-            />
-            <TextField
-              size="small"
-              value={userId}
-              onChange={(e) => onUserIdChange(e.target.value)}
-              placeholder="user-123"
-              sx={{
-                width: 160,
-                '& .MuiOutlinedInput-root': {
-                  height: 32,
-                  fontSize: '0.875rem',
-                },
-              }}
+            <UserSelector
+              value={user_id}
+              onChange={onUser_idChange}
+              onUserSelect={onUserSelect}
             />
           </Box>
 
