@@ -13,10 +13,12 @@ from uuid import UUID
 from fastapi import APIRouter, Body, Header, Depends
 from fastapi.responses import StreamingResponse
 
-from app.core.enums import RouterTag
+from app.core.enums import RouterTag, LLMProvider
 from app.schemas.ChatRequest import ChatRequest
 from app.services import AgentServiceInterface
 from app.core.di_container import inject
+
+from app.utils.reframe_chat import  ReframeChat
 
 agentic_router = APIRouter(prefix="/agent", tags=[RouterTag.agent.value])
 
@@ -34,7 +36,7 @@ def get_agent_service() -> AgentServiceInterface:
 async def create_and_update_chat(
     user_id: str = Header(...),
     body: ChatRequest = Body(...),
-    agent_service: AgentServiceInterface = Depends(get_agent_service),
+    agent_service: AgentServiceInterface = Depends(get_agent_service)
 ) -> StreamingResponse:
     """Create or continue a chat conversation with an AI agent.
     
@@ -106,10 +108,14 @@ async def create_and_update_chat(
     Note:
         The endpoint uses FastAPI's StreamingResponse to provide real-time
         chat responses, enabling responsive user experiences in the frontend.
+        :param user_id:
+        :param body:
+        :param agent_service:
     """
     message: str = body.message
     thread_id: Optional[UUID | None] = body.thread_id
     thread_label: str = body.thread_label  # Now mandatory
+    message = ReframeChat().correct(message)
     response = agent_service.stream_chat_tokens(user_id, thread_id, message, thread_label)
     return StreamingResponse(
         response,

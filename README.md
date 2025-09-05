@@ -10,19 +10,22 @@ A production-ready full-stack application featuring a **FastAPI backend** and **
 - **Dependency Injection Container** following DIP principles
 - **Multiple LLM Support** (Ollama, Google Gemini) via factory pattern
 - **LangGraph Integration** for agent orchestration with checkpointing
-- **SQLite Persistence** with thread management
+- **SQLite Persistence** with thread management and conversation history
+- **Token-Level Streaming** via Server-Sent Events (SSE) for real-time chat
+- **Text Correction Utility** with AI-powered grammar and spelling correction
 - **Global Error Handling** with standardized response formats
 - **Observability** with correlation IDs and request logging
-- **Developer Tooling** (Ruff, Black, mypy, pytest, pre-commit)
+- **Developer Tooling** (Ruff, Black, mypy, pytest, pre-commit hooks)
 
 ### Frontend (React + Vite)
 - **Modern Chat Interface** with Material-UI components
 - **Real-time Streaming** chat responses via Server-Sent Events (SSE)
-- **Thread Management** with sidebar navigation and labels
+- **Thread Management** with sidebar navigation, labels, and auto-generation
 - **User Management** with dropdown selection and persistence
 - **Dark/Light Mode** toggle with localStorage persistence
 - **Responsive Design** optimized for desktop and mobile
 - **Error Boundaries** for graceful error handling
+- **Thread Label Preview** with live preview while typing
 
 ## 🏢 Architecture Overview
 
@@ -100,6 +103,7 @@ app/
   │   ├── ChatRequest.py        # Chat request/response schemas
   │   └── chat.py               # Additional chat schemas
   ├── utils/                    # Utility functions
+  │   ├── reframe_chat.py       # AI-powered text reframing service
   │   └── text.py               # Text processing utilities
   ├── config/                   # Configuration management
   │   └── SqlLiteConfig.py      # SQLite connection singleton
@@ -142,6 +146,71 @@ agent_service = inject(AgentServiceInterface)
 - **Repository Layer**: Data access and persistence
 - **Agents Layer**: AI/LLM provider abstraction
 - **Routers Layer**: HTTP endpoint handling and request routing
+
+### Dependency Injection (DI) Container
+
+The application implements a comprehensive dependency injection system that follows the **Dependency Inversion Principle (DIP)** for better testability, maintainability, and loose coupling.
+
+#### Key Features
+- **Type-Safe Resolution**: Automatic type checking and resolution
+- **Multiple Lifecycles**: Singleton, transient, and factory patterns
+- **Circular Dependency Detection**: Prevents infinite dependency loops
+- **Interface-Based**: All dependencies resolved through interfaces
+- **Comprehensive Error Handling**: Clear error messages for missing dependencies
+
+#### Service Registration Patterns
+
+```python
+from app.core.di_container import get_container, inject
+
+container = get_container()
+
+# Singleton: Single instance shared across application
+container.register_singleton(DatabaseConnectionProvider, SQLiteConnectionProvider())
+
+# Transient: New instance created for each resolution
+container.register_transient(LLMProviderInterface, LLMFactoryImpl)
+
+# Factory: Custom factory function for complex initialization
+def thread_repository_factory():
+    db_provider = container.resolve(DatabaseConnectionProvider)
+    return ThreadRepositoryImpl(db_provider)
+
+container.register_factory(ThreadRepositoryInterface, thread_repository_factory)
+
+# Utility services (e.g., ReframeChat)
+container.register_factory(ReframeChat, create_reframe_chat_service)
+```
+
+#### Using Dependency Injection
+
+**Option 1: Constructor Injection (Recommended)**
+```python
+from app.core.di_container import inject
+from app.utils.reframe_chat import ReframeChat
+
+# Service automatically gets all dependencies injected
+class MyService:
+    def __init__(self, reframer: ReframeChat = None):
+        self.reframer = reframer or inject(ReframeChat)
+    
+    def process_text(self, text: str) -> str:
+        return self.reframer.correct(text)
+```
+
+**Option 2: Direct Resolution**
+```python
+# Direct resolution when needed
+reframer = inject(ReframeChat)
+corrected_text = reframer.correct("bad grammer text")
+```
+
+#### Benefits of DI Implementation
+- **Testability**: Easy to mock dependencies in unit tests
+- **Flexibility**: Swap implementations without changing client code
+- **Separation of Concerns**: Clear boundaries between components
+- **Configuration**: Centralized dependency configuration
+- **Maintainability**: Loose coupling makes refactoring easier
 
 ### Frontend Structure
 ```
@@ -186,7 +255,112 @@ ui/src/
   └── main.jsx                  # Application entry point
 ```
 
+## 📦 Dependencies & Installation
+
+### Core Dependencies
+The application uses a **lean dependency approach** with the following core requirements:
+
+**Essential Runtime:**
+- `fastapi` - High-performance web framework
+- `uvicorn[standard]` - ASGI server
+- `pydantic` & `pydantic-settings` - Data validation and settings
+- `python-dotenv` - Environment variable management
+
+**AI/LLM Framework:**
+- `langgraph` - Agent workflow orchestration
+- `langchain-core` - Core LangChain functionality
+- `langchain-ollama` - Ollama LLM integration
+- `langchain-google-genai` - Google Gemini integration
+
+**Database:**
+- SQLite (built-in Python) - No additional dependencies required
+
+### Optional Dependencies
+The `requirements.txt` includes many **optional dependencies** for extended functionality:
+
+```bash
+# Optional LLM Providers (install only what you need)
+openai              # OpenAI GPT models
+anthropic          # Anthropic Claude models
+groq               # Groq API
+litellm            # Multi-provider LLM interface
+
+# Optional Vector Databases (pick one if needed)
+chromadb           # Chroma vector database
+qdrant-client      # Qdrant vector database
+
+# Optional Features
+redis              # Caching/session storage
+sse-starlette      # Server-sent events
+python-multipart   # File upload support
+orjson             # Fast JSON serialization
+```
+
+### Dependency Optimization
+> **💡 Optimization Tip**: For a **minimal installation**, you can create a custom `requirements-minimal.txt` with only the core dependencies listed above. The application is designed to work with just the essential packages.
+
+### Development Dependencies
+```bash
+# Code Quality & Testing
+ruff               # Fast Python linter
+black              # Code formatter
+isort              # Import organizer
+mypy               # Type checker
+bandit             # Security scanner
+pytest             # Testing framework
+pre-commit         # Git hooks
+```
+
+### Installation Methods
+
+#### Method 1: Full Installation
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+```
+
+#### Method 2: Pipenv (Recommended)
+```bash
+pipenv install --dev
+```
+
+#### Method 3: Make Command (Auto-detection)
+```bash
+make install  # Detects pipenv/pip automatically
+```
+
 ## 🔧 Prerequisites
+
+## ✨ Recent Improvements & Features
+
+### 🚀 Token-Level Streaming
+- **Real-time Chat Experience**: Token-by-token streaming for immediate response feedback
+- **Server-Sent Events (SSE)**: Efficient streaming protocol for web applications
+- **Hybrid Architecture**: Combines LangGraph workflow management with direct LLM streaming
+- **Format**: `{"type": "token", "content": "..."}` for consistent frontend integration
+
+### 📦 Dependency Injection Improvements
+- **Spring MVC Architecture**: Clean interface-implementation separation
+- **Type-Safe Resolution**: Automatic dependency resolution with type checking
+- **Multiple Lifecycles**: Support for singleton, transient, and factory patterns
+- **Error Handling**: Clear error messages for missing or circular dependencies
+
+### 📝 Text Correction Utility
+- **AI-Powered Correction**: Uses LLM for grammar, spelling, and clarity improvements
+- **Dependency Injected**: Seamlessly integrates with the DI container
+- **Minimal & Clean**: Simplified implementation focusing on core functionality
+- **Production Ready**: Comprehensive error handling and logging
+
+### 📊 Thread Management Enhancements
+- **Auto-Generated Labels**: Thread names automatically generated from first message
+- **Label Preview**: Live preview of thread name while typing
+- **Thread Continuity**: Proper thread state management across conversations
+- **User Management**: Multi-user support with session isolation
+
+### 🛠️ Developer Experience
+- **Automated Quality Gates**: Pre-commit hooks, linting, formatting, type checking
+- **Make Commands**: Streamlined development workflow with auto-detection
+- **Comprehensive Documentation**: Google-style docstrings throughout codebase
+- **API Documentation**: Interactive Swagger UI and ReDoc interfaces
 
 ### Backend Requirements
 - **Python 3.11+**
@@ -237,6 +411,13 @@ pip install -r requirements-dev.txt
 pipenv install --dev
 ```
 
+#### Using Make (Automatic Detection)
+```bash
+make install  # Automatically detects pipenv or falls back to pip
+```
+
+> **Note**: The `requirements.txt` includes optional dependencies for various LLM providers and vector databases. You only need to install the providers you plan to use. The core application requires `langchain-core`, `langchain-ollama`, `langchain-google-genai`, `langgraph`, `fastapi`, `uvicorn`, and `sqlite` dependencies.
+
 ### 3. Environment Configuration
 
 Create a `.env` file in the repository root:
@@ -268,24 +449,29 @@ LLM_TEMPERATURE=0.7
 
 ### 4. Run Backend
 
-#### Method 1: Direct uvicorn
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
-```
-
-#### Method 2: Python module
-```bash
-python -m app.main
-```
-
-#### Method 3: Make command
+#### Method 1: Make command (Recommended)
 ```bash
 make run
 ```
 
-#### Method 4: Pipenv
+#### Method 2: Make development mode
 ```bash
-pipenv run uvicorn app.main:app --reload
+make dev
+```
+
+#### Method 3: Direct uvicorn
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
+```
+
+#### Method 4: Python module
+```bash
+python -m app.main
+```
+
+#### Method 5: Pipenv
+```bash
+pipenv run python -m app.main
 ```
 
 ### 5. Frontend Setup
@@ -307,6 +493,49 @@ npm run dev
 - **Frontend**: http://localhost:5173
 - **API Documentation**: http://localhost:8080/docs
 - **Alternative API Docs**: http://localhost:8080/redoc
+
+## 🔧 Development Commands
+
+### Code Quality & Formatting
+```bash
+# Format code and fix import order
+make format
+
+# Lint with Ruff and auto-fix issues
+make lint
+
+# Type check with mypy
+make type
+
+# Security scan with Bandit
+make security
+
+# Run tests with pytest
+make test
+
+# Install pre-commit hooks
+make hooks
+
+# Run all quality gates
+make all
+
+# Clean cache and temporary files
+make clean
+```
+
+### Project Management
+```bash
+# Install dependencies (auto-detects pipenv/pip)
+make install
+
+# Run application in production mode
+make run
+
+# Run application in development mode (with reload)
+make dev
+```
+
+> **Note**: All commands automatically detect if you're using pipenv and run within the virtual environment.
 
 ## 📚 API Documentation Reference
 
@@ -791,6 +1020,27 @@ The following modules have comprehensive documentation:
 
 #### Utilities (`app/utils/`)
 - **`text.py`**: Content extraction and text processing utilities
+- **`reframe_chat.py`**: **AI-powered text correction service with dependency injection support**
+  - **Text Correction**: Grammar, spelling, and clarity improvements using LLM
+  - **Dependency Injection**: Follows DIP principles with automatic LLM provider injection
+  - **Minimal & Clean**: Simplified implementation focusing on core functionality
+  - **Error Handling**: Comprehensive error handling with custom exceptions
+  - **Usage Example**:
+    ```python
+    from app.core.di_container import inject
+    from app.utils.reframe_chat import ReframeChat
+    
+    # Using dependency injection (recommended)
+    reframer = inject(ReframeChat)
+    
+    # Basic text correction
+    corrected = reframer.correct("i need halp with my cod")
+    # Returns: "I need help with my code"
+    
+    # Fix grammar and spelling
+    fixed = reframer.correct("this funktoin dosnt work proprly")
+    # Returns: "This function doesn't work properly"
+    ```
 
 #### Service Layer (`app/services/`)
 - **`agent_service_interface.py`**: Agent service contracts (AgentServiceInterface, AgentExecutionInterface, ConversationStateInterface)
@@ -988,6 +1238,49 @@ CREATE TABLE session_threads (
 - `OLLAMA_MODEL_NAME`: Ollama model name
 - `GOOGLE_API_KEY`: Google AI API key
 - `GEMINI_MODEL_NAME`: Gemini model name
+
+## 🚑 Quick Troubleshooting
+
+### Common Setup Issues
+
+#### LLM Provider Issues
+```bash
+# Ollama not responding
+curl http://localhost:11434/api/tags
+ollama serve  # if not running
+ollama pull llama3.1  # if model missing
+
+# Google Gemini API issues
+echo $GOOGLE_API_KEY  # verify key is set
+```
+
+#### Dependency Problems
+```bash
+# Clean install
+make clean && make install
+
+# Manual reinstall
+pip install -r requirements.txt --force-reinstall
+```
+
+#### Frontend-Backend Connection
+```bash
+# Check CORS settings in .env
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+
+# Verify ports are free
+lsof -i :8080  # Backend
+lsof -i :5173  # Frontend
+```
+
+#### Database Permissions
+```bash
+# Create db directory
+mkdir -p app/db
+
+# Check permissions
+ls -la app/db/
+```
 
 ## 🚀 Deployment
 
@@ -1527,3 +1820,37 @@ This project is licensed under the terms of the [LICENSE](LICENSE) file in this 
 - [Material-UI Documentation](https://mui.com/)
 - [LangChain Documentation](https://python.langchain.com/)
 - [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
+
+---
+
+## 📋 Summary
+
+**AgenticAI** is a production-ready, full-stack AI chat application that demonstrates modern software architecture principles and best practices:
+
+### 🏗️ **Architecture Highlights**
+- **Spring MVC Pattern**: Clean separation with interface-implementation design
+- **Dependency Injection**: Type-safe DI container following SOLID principles
+- **Microservice-Ready**: Modular design with clear service boundaries
+- **Real-time Streaming**: Token-level chat streaming via Server-Sent Events
+
+### 🚀 **Technical Excellence**
+- **Quality Gates**: Automated formatting, linting, type checking, and security scanning
+- **Developer Experience**: Make commands, pre-commit hooks, and comprehensive documentation
+- **Testing Ready**: Structured for easy unit testing with dependency injection
+- **Production Ready**: Error handling, logging, observability, and deployment guides
+
+### 🔧 **Flexibility & Extensibility**
+- **Multiple LLM Support**: Easy to add new providers via factory pattern
+- **Lean Dependencies**: Optional packages for minimal installation footprint
+- **Configuration-Driven**: Environment-based configuration for different deployments
+- **Modern Stack**: FastAPI + React with TypeScript support
+
+### 🎯 **Perfect For**
+- Learning modern full-stack development patterns
+- Building production AI chat applications
+- Demonstrating clean architecture principles
+- Rapid prototyping of AI-powered features
+
+**Get started in 5 minutes:** `git clone → make install → make run → open http://localhost:8080/docs`
+
+*Built with ❤️ for developers who value clean code and modern architecture.*
