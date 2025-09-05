@@ -225,6 +225,7 @@ def configure_dependencies() -> DIContainer:
         AgentServiceImpl,
         UserServiceImpl,
     )
+    from app.utils.reframe_chat import ReframeChat, create_reframe_chat_service
     
     def langgraph_service_factory():
         llm_provider = container.resolve(LLMProviderInterface)
@@ -246,6 +247,9 @@ def configure_dependencies() -> DIContainer:
     container.register_factory(ConversationStateInterface, langgraph_service_factory)
     container.register_factory(AgentServiceInterface, agent_service_factory)
     container.register_factory(UserServiceInterface, user_service_factory)
+    
+    # Utility services
+    container.register_factory(ReframeChat, create_reframe_chat_service)
     
     logger.info("Dependencies configured")
     return container
