@@ -1,14 +1,16 @@
 """Agent service interfaces.
 
 This module defines interfaces for AI agent services following
-Interface Segregation Principle (ISP).
+Interface Segregation Principle (ISP). These interfaces support
+StateGraphObject-based implementations for workflow orchestration.
 """
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
 from collections.abc import AsyncGenerator
 from uuid import UUID
+
+from langgraph.types import StateSnapshot
 
 
 class AgentServiceInterface(ABC):
@@ -54,6 +56,7 @@ class ConversationStateInterface(ABC):
     
     Separated from execution to follow ISP, allowing clients
     that only need state access to depend on this interface.
+    Supports StateGraphObject-based conversation persistence.
     """
     
     @abstractmethod
@@ -61,6 +64,14 @@ class ConversationStateInterface(ABC):
         self, 
         thread_id: UUID, 
         user_id: str
-    ) -> Any:  # StateSnapshot type from langgraph
-        """Retrieve conversation state for a specific thread."""
+    ) -> StateSnapshot:
+        """Retrieve conversation state for a specific thread.
+        
+        Args:
+            thread_id: Thread identifier to retrieve state for
+            user_id: User/session identifier for context
+            
+        Returns:
+            StateSnapshot: Current state of the conversation thread
+        """
         pass

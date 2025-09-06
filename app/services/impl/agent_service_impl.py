@@ -73,7 +73,9 @@ class AgentServiceImpl(AgentServiceInterface):
                 - Individual response tokens as they're generated
                 - End-of-stream marker
         """
-        return self._stream_chat_tokens_impl(user_id, thread_id, message, thread_label)
+        return self._stream_chat_tokens_impl(user_id=user_id,
+                                             thread_id=thread_id,
+                                             message=message,thread_label= thread_label)
     
     async def _stream_chat_tokens_impl(
         self,
@@ -87,7 +89,7 @@ class AgentServiceImpl(AgentServiceInterface):
         
         # Get the async generator by calling execute_agent
         agent_generator = self._agent_executor.execute_agent(
-            message, thread_id, user_id, thread_label
+            message=message, thread_id=thread_id, user_id=user_id, thread_label=thread_label
         )
         
         # Iterate through the async generator

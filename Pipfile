@@ -32,6 +32,12 @@ langgraph-checkpoint-sqlite = "*"
 langchain-google-genai = "*"
 langchain-groq = "*"
 langchain-anthropic = "*"
+langgraph-prebuilt = "*"
+duckduckgo-search = "*"
+ddgs = "*"
+transformers = "*"
+torch = "*"
+langchain-huggingface = "*"
 
 [dev-packages]
 black = "*"

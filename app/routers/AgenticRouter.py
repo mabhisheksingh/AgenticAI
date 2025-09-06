@@ -13,12 +13,12 @@ from uuid import UUID
 from fastapi import APIRouter, Body, Header, Depends
 from fastapi.responses import StreamingResponse
 
+from app.utils.mt5_service import MT5Service
 from app.core.enums import RouterTag, LLMProvider
 from app.schemas.ChatRequest import ChatRequest
 from app.services import AgentServiceInterface
 from app.core.di_container import inject
 
-from app.utils.reframe_chat import  ReframeChat
 
 agentic_router = APIRouter(prefix="/agent", tags=[RouterTag.agent.value])
 
@@ -32,11 +32,21 @@ def get_agent_service() -> AgentServiceInterface:
     return inject(AgentServiceInterface)
 
 
+def get_mt5_service() -> MT5Service:
+    """Dependency injection for MT5Service.
+
+    Returns:
+        MT5Service: Injected MT5 service instance
+    """
+    return inject(MT5Service)
+
+
 @agentic_router.post("/chat")
 async def create_and_update_chat(
-    user_id: str = Header(...),
-    body: ChatRequest = Body(...),
-    agent_service: AgentServiceInterface = Depends(get_agent_service)
+        user_id: str = Header(...),
+        body: ChatRequest = Body(...),
+        agent_service: AgentServiceInterface = Depends(get_agent_service),
+        mt5_service: MT5Service = Depends(get_mt5_service),
 ) -> StreamingResponse:
     """Create or continue a chat conversation with an AI agent.
     
@@ -108,6 +118,8 @@ async def create_and_update_chat(
     Note:
         The endpoint uses FastAPI's StreamingResponse to provide real-time
         chat responses, enabling responsive user experiences in the frontend.
+        :param mt5_service:
+        :param llm_factory:
         :param user_id:
         :param body:
         :param agent_service:
@@ -115,7 +127,8 @@ async def create_and_update_chat(
     message: str = body.message
     thread_id: Optional[UUID | None] = body.thread_id
     thread_label: str = body.thread_label  # Now mandatory
-    message = ReframeChat().correct(message)
+
+    message = mt5_service.correct_grammar(message)
     response = agent_service.stream_chat_tokens(user_id, thread_id, message, thread_label)
     return StreamingResponse(
         response,

@@ -1,6 +1,6 @@
-"""LangGraph service implementation for AI agent orchestration and conversation management.
+"""LangGraph service implementation using StateGraphObject for AI agent orchestration.
 
-This module provides the core AI agent functionality using LangGraph for
+This module provides AI agent functionality using the StateGraphObject for
 workflow orchestration, message handling, and conversation state management
 with SQLite persistence.
 
@@ -12,14 +12,11 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 import json
 import logging
-from typing import Any, cast
 import uuid
+from typing import cast
 from uuid import UUID
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
-from langgraph.checkpoint.sqlite import SqliteSaver
-from langgraph.constants import END, START
-from langgraph.graph import MessagesState, StateGraph
 from langgraph.types import StateSnapshot
 from langchain_core.runnables import RunnableConfig
 
@@ -28,100 +25,60 @@ from app.services import (
     AgentExecutionInterface,
     ConversationStateInterface,
 )
-from app.agents import LLMProviderInterface
+from app.agents import LLMFactoryInterface
+from app.agents.state_graph_object import StateGraphObject
 from app.repositories import ThreadRepositoryInterface
 from app.repositories import DatabaseConnectionProvider
 
 # Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
-def serialize(obj: Any) -> dict[str, Any] | str:
-    """Serialize objects for logging and debugging purposes.
-    
-    Converts LangChain message objects and other types to serializable formats.
-    
-    Args:
-        obj (Any): Object to serialize
-        
-    Returns:
-        dict[str, Any] | str: Serialized representation of the object
-    """
-    if isinstance(obj, BaseMessage):
-        return obj.dict()
-    return str(obj)
+
 
 
 class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
-    """Service implementation for AI agent orchestration using LangGraph workflows.
+    """Service implementation for AI agent orchestration using StateGraphObject.
     
     Implements AgentExecutionInterface and ConversationStateInterface following
     ISP (Interface Segregation Principle) and uses dependency injection following
     DIP (Dependency Inversion Principle).
     
-    This service manages AI agent interactions using LangGraph's workflow system,
-    providing conversation state management, message handling, and streaming
-    response capabilities with SQLite persistence.
+    This service manages AI agent interactions using StateGraphObject for
+    workflow orchestration, providing conversation state management, message
+    handling, and streaming response capabilities with SQLite persistence.
     
     Features:
-    - LangGraph workflow orchestration
+    - StateGraphObject-based workflow orchestration
     - SQLite-based conversation checkpointing
     - Streaming response generation
     - Thread and session management
     - Message history loading and persistence
-    - AI agent state management
-    
-    Architecture:
-    - Uses LangGraph StateGraph for workflow definition
-    - SqliteSaver for conversation checkpointing
-    - LLMProviderInterface for language model instantiation
-    - ThreadRepositoryInterface for thread metadata management
-    
-    The service builds a simple workflow: START → chat_model → END
-    where the chat_model node invokes the LLM with conversation history.
     """
     
     def __init__(
         self,
-        llm_provider: LLMProviderInterface,
+        llm_provider: LLMFactoryInterface,
         thread_repository: ThreadRepositoryInterface,
         db_provider: DatabaseConnectionProvider,
     ):
-        """Initialize the LangGraphService with dependency injection.
-        
-        Sets up the complete LangGraph workflow including:
-        - LLM instance from provider
-        - State graph compilation
-        - SQLite checkpointer configuration
-        - Graph compilation with checkpointing enabled
+        """Initialize the LangGraphService with StateGraphObject.
         
         Args:
             llm_provider: Provider for creating LLM instances
             thread_repository: Repository for thread management
             db_provider: Database connection provider
         """
-        self.thread_id = None
-        self._llm_provider = llm_provider
         self._thread_repository = thread_repository
-        self._db_provider = db_provider
         
-        # Initialize LLM and graph
-        self.llm = self._llm_provider.create_model(LLMProvider.LLM_MEDIUM_MODEL)
-        # Compile hybrid graph with sync checkpointer
-        state_graph = self.prepare_state_graph()
-        checkpointer = self._get_sql_lite_memory()
-        self.graph = state_graph.compile(checkpointer=checkpointer)
+        # Initialize LLM and create StateGraphObject
+        llm = llm_provider.create_model(LLMProvider.LLM_MEDIUM_MODEL)
+        self.state_graph_obj = StateGraphObject(llm, db_provider)
+        self.graph = self.state_graph_obj.prepare_state_graph()
 
     @staticmethod
     def _get_session_and_thread_config(thread_id: UUID | str, session_id: str) -> RunnableConfig:
         """Create LangGraph configuration for thread and session context.
-        
-        Builds the configuration object required by LangGraph for conversation
-        context, including thread ID and session ID for proper state management.
         
         Args:
             thread_id (UUID | str): Thread identifier for conversation context
@@ -129,78 +86,10 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
             
         Returns:
             RunnableConfig: LangGraph configuration with configurable parameters
-            
-        Example:
-            >>> config = LangGraphService._get_session_and_thread_config(
-            ...     "thread-123", "user-456"
-            ... )
-            >>> print(config)
-            {"configurable": {"thread_id": "thread-123", "session_id": "user-456"}}
         """
         config = {"configurable": {"thread_id": str(thread_id), "session_id": str(session_id)}}
-        logger.info("Config: %s", config)
         return cast(RunnableConfig, config)
 
-    def _get_sql_lite_memory(self) -> SqliteSaver:
-        """Create and configure SQLite-based conversation checkpointer.
-        
-        Sets up the LangGraph checkpointer using the application's SQLite
-        database instance for persistent conversation state management.
-        
-        Returns:
-            SqliteSaver: Configured SQLite checkpointer for LangGraph
-            
-        Note:
-            Uses the same SQLite connection as the rest of the application
-            for consistent data storage and transaction management.
-        """
-        sql_lite_instance = self._db_provider.get_connection()
-        memory = SqliteSaver(sql_lite_instance)
-        return memory
-
-    # Node for sync/hybrid approach
-    def call_llm(self, state: MessagesState) -> dict[str, list[BaseMessage]]:
-        """LangGraph node function for invoking the language model.
-        
-        This is the core node in the LangGraph workflow that processes
-        the conversation messages and generates AI responses.
-        
-        Args:
-            state (MessagesState): Current state containing conversation messages
-            
-        Returns:
-            dict[str, list[BaseMessage]]: Updated state with AI response message
-            
-        Note:
-            This function is designed to be used as a LangGraph node and follows
-            the LangGraph node function pattern of receiving state and returning
-            state updates.
-        """
-        # Ensure we append the generated AIMessage to the messages list
-        return {"messages": [self.llm.invoke(state["messages"])]}
-
-    def prepare_state_graph(self) -> StateGraph:
-        """Build and configure the LangGraph state graph workflow.
-        
-        Creates a simple linear workflow for chat interactions:
-        START → chat_model → END
-        
-        The workflow uses MessagesState to maintain conversation context
-        and provides a single node for LLM interaction.
-        
-        Returns:
-            StateGraph: Configured LangGraph workflow ready for compilation
-            
-        Workflow Structure:
-        - MessagesState: Maintains list of conversation messages
-        - chat_model node: Invokes LLM with current message history
-        - Linear flow: START → chat_model → END
-        """
-        builder = StateGraph(MessagesState)
-        builder.add_node("chat_model", self.call_llm)
-        builder.add_edge(START, "chat_model")
-        builder.add_edge("chat_model", END)
-        return builder
 
     def get_conversation_state(self, thread_id: UUID, user_id: str) -> StateSnapshot:
         """Retrieve conversation state for a specific thread.
@@ -258,11 +147,12 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
         user_id: str,
         thread_label: str,
     ) -> AsyncGenerator[str, None]:
-        logger.info("Pure LangGraph approach: Starting agent execution")
+        """Execute AI agent using StateGraphObject and stream response tokens."""
+        logger.info("StateGraphObject: Starting agent execution")
         
         # Load thread history and update with new message
         chat_messages, actual_thread_id = self.load_and_update_thread(thread_id, user_id, thread_label)
-        thread_id = actual_thread_id  # Use the actual thread_id (might be newly created)
+        thread_id = actual_thread_id
         
         # Add the new user message
         chat_messages.append(HumanMessage(content=message))
@@ -270,39 +160,35 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
         # Initial metadata event
         yield f"data: {json.dumps({'threadId': str(thread_id), 'userId': user_id})}\n\n"
 
-        # User asked question
+        # User message acknowledgment
         yield f"data: {json.dumps({'type': 'user','content': 'Got it 👍 you want ' + ' '.join(message)})}\n\n"
 
         try:
-            # Ensure thread_id is not None at this point
             if thread_id is None:
                 raise ValueError("thread_id cannot be None at streaming time")
             
-            config = LangGraphServiceImpl._get_session_and_thread_config(thread_id, user_id)
-
-            # Stream through LangGraph's native streaming system with messages mode
+            config = self._get_session_and_thread_config(thread_id, user_id)
+            logger.info("StateGraphObject: Starting streaming --> %s",chat_messages)
+            # Stream through StateGraphObject
             for chunk in self.graph.stream(
                 {"messages": chat_messages}, config, stream_mode="messages"
             ):
-
-                # Handle the tuple format: (AIMessageChunk, metadata)
+                # Handle streaming chunks
                 if isinstance(chunk, tuple) and len(chunk) == 2:
                     message_chunk, metadata = chunk
                     if hasattr(message_chunk, "content") and getattr(message_chunk, "content", None):
                         content = str(message_chunk.content)
-                        node_name = metadata.get("langgraph_node", "unknown") if isinstance(metadata, dict) else "unknown"
-                        # Send properly formatted SSE data for each token
-                        yield f"data: {json.dumps({'type': 'token', 'content': content, 'metadata': {'node': node_name, 'approach': 'pure_langgraph'}})}\n\n"
+                        node_name = metadata.get("langgraph_node", "assistant") if isinstance(metadata, dict) else "assistant"
+                        yield f"data: {json.dumps({'type': 'token', 'content': content, 'metadata': {'node': node_name}})}\n\n"
                 elif hasattr(chunk, "content") and getattr(chunk, "content", None):
-                    # Direct AIMessageChunk object
                     content = str(getattr(chunk, "content", ""))
-                    yield f"data: {json.dumps({'type': 'token', 'content': content, 'metadata': {'approach': 'pure_langgraph'}})}\n\n"
+                    yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
 
-            logger.info(f"Pure LangGraph streaming completed for thread {thread_id}")
+            logger.info(f"StateGraphObject streaming completed for thread {thread_id}")
 
         except Exception as e:
-            logger.error(f"Error in pure LangGraph streaming: {e}")
-            yield f"data: {json.dumps({'type': 'error', 'content': str(e), 'approach': 'pure_langgraph'})}\n\n"
+            logger.error(f"Error in StateGraphObject streaming: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
 
         # End of stream marker
         yield "data: [DONE]\n\n"
@@ -312,9 +198,6 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
     ) -> tuple[list[BaseMessage], UUID]:
         """Load or create conversation thread with message history.
         
-        Handles both new thread creation and existing thread loading,
-        including conversation history retrieval from the LangGraph checkpointer.
-        
         Args:
             thread_id (UUID, optional): Existing thread ID. If None, creates new thread.
             user_id (str): User/session identifier
@@ -322,37 +205,6 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
             
         Returns:
             tuple[list[BaseMessage], UUID]: Conversation messages and thread ID
-            
-        Side Effects:
-            - For new threads: Updates thread_id parameter and saves to ThreadRepository
-            - For existing threads: Validates thread exists
-            
-        Thread Creation (thread_id is None):
-        1. Generate new UUID for thread
-        2. Save thread metadata to ThreadRepository
-        3. Initialize with system message
-        
-        Existing Thread Loading:
-        1. Validate thread exists in ThreadRepository
-        2. Load conversation history from LangGraph checkpointer
-        3. Fallback to system message if history loading fails
-        
-        Error Handling:
-        - Raises exception if existing thread not found
-        - Graceful fallback for checkpointer failures
-        - Logging for debugging conversation loading issues
-        
-        System Message:
-            All conversations start with a system message defining the AI's role:
-            "Hey! You are a helpful assistant expert in Crime and Law"
-            
-        Example:
-            >>> messages = service.load_and_update_thread(
-            ...     thread_id=None,
-            ...     user_id="user123",
-            ...     thread_label="Legal Questions"
-            ... )
-            >>> print(f"Loaded {len(messages)} messages")
         """
         chat_messages = []
         is_new_thread = thread_id is None
@@ -372,7 +224,7 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
 
             # Load existing conversation history from LangGraph checkpointer
             try:
-                config = LangGraphServiceImpl._get_session_and_thread_config(thread_id, user_id)
+                config = self._get_session_and_thread_config(thread_id, user_id)
                 state = self.graph.get_state(config)
 
                 if state and state.values and "messages" in state.values:
