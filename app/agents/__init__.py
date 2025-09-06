@@ -9,8 +9,8 @@ and implementations are in impl/ subfolder.
 """
 
 # Import and re-export interfaces
-from .llm_provider_interface import LLMProviderInterface
+from .llm_factory_interface import LLMFactoryInterface
 
 __all__ = [
-    "LLMProviderInterface",
+    "LLMFactoryInterface",
 ]

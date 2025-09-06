@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any, Callable, TypeVar, cast
 import logging
 
-from app.agents.llm_provider_interface import LLMProviderInterface
+from app.agents.llm_factory_interface import LLMFactoryInterface
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +187,7 @@ def configure_dependencies() -> DIContainer:
         UserRepositoryInterface,
         ThreadQueryInterface,
     )
-    from app.agents import llm_provider_interface
+    from app.agents import llm_factory_interface
     from app.services import (
         AgentExecutionInterface,
         ConversationStateInterface,
@@ -217,7 +217,7 @@ def configure_dependencies() -> DIContainer:
     
     # LLM Factory
     from app.agents.impl import LLMFactoryImpl
-    container.register_transient(LLMProviderInterface, LLMFactoryImpl)
+    container.register_transient(LLMFactoryInterface, LLMFactoryImpl)
     
     # Services
     from app.services.impl import (
@@ -226,9 +226,10 @@ def configure_dependencies() -> DIContainer:
         UserServiceImpl,
     )
     from app.utils.reframe_chat import ReframeChat, create_reframe_chat_service
+    from app.utils.mt5_service import MT5Service
     
     def langgraph_service_factory():
-        llm_provider = container.resolve(LLMProviderInterface)
+        llm_provider = container.resolve(LLMFactoryInterface)
         thread_repository = container.resolve(ThreadRepositoryInterface)
         db_provider = container.resolve(DatabaseConnectionProvider)
         return LangGraphServiceImpl(llm_provider, thread_repository, db_provider)
@@ -250,6 +251,15 @@ def configure_dependencies() -> DIContainer:
     
     # Utility services
     container.register_factory(ReframeChat, create_reframe_chat_service)
+    
+    # Pre-create MT5Service to avoid circular dependency
+    def mt5_service_factory():
+        # Create a new instance of LLMFactoryImpl directly to avoid DI resolution
+        from app.agents.impl import LLMFactoryImpl
+        llm_factory = LLMFactoryImpl()
+        return MT5Service(llm_factory)
+    
+    container.register_factory(MT5Service, mt5_service_factory)
     
     logger.info("Dependencies configured")
     return container

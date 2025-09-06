@@ -6,11 +6,12 @@ A production-ready FastAPI backend with React frontend for agentic AI conversati
 
 ### Backend
 - **Versioned REST API** with Spring MVC architecture
-- **Multiple LLM Support**: Ollama, Google Gemini, OpenAI, Anthropic, Groq
+- **Multiple LLM Support**: Ollama, Google Gemini, OpenAI, Anthropic, Groq, Hugging Face
 - **Real-time Streaming** via Server-Sent Events (SSE)
 - **SQLite Persistence** with thread management
 - **Dependency Injection** with type-safe resolution
 - **Security**: SecretStr API keys, input validation, error handling
+- **Specialized AI Services**: Grammar correction, translation, and text summarization
 
 ### Frontend
 - **Modern Chat UI** with Material-UI components
@@ -33,6 +34,7 @@ Frontend (React) ↔️ HTTP/SSE ↔️ FastAPI Backend ↔️ LLM Providers
 - **Repositories**: Data access layer (SQLite)
 - **Agents**: LLM provider abstractions (factory pattern)
 - **Routers**: REST API endpoints (`/v1/user/*`, `/v1/agent/*`)
+- **Specialized AI Services**: MT5Service for grammar correction and translation
 
 ### Project Structure
 ```
@@ -195,6 +197,7 @@ make install  # Detects pipenv/pip automatically
 - **Ollama (Local)**: Install Ollama and pull a model like `llama3.1:8b`
 - **Google Gemini**: Get API key from [Google AI Studio](https://aistudio.google.com/)
 - **OpenAI**: Get API key from [OpenAI Platform](https://platform.openai.com/)
+- **Hugging Face Models**: For specialized tasks like grammar correction and translation
 - **Others**: Anthropic Claude or Groq (see environment setup)
 
 ### 1. Setup
@@ -225,24 +228,36 @@ HOST=0.0.0.0
 PORT=8080
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 
-# Choose ONE LLM provider:
+# === LLM Provider Selection ===
+# === Small / Fast models (cheap, quick tasks like correction, summarization, classification) ===
+LLM_SMALL_MODEL=llama3.1:8b
+# === Medium models (good balance, reasoning, multi-lingual tasks like Hinglish correction) ===
+LLM_MEDIUM_MODEL=llama3.1:8b
+# === Large models (deep reasoning, content generation, complex workflows) ===
+LLM_LARGE_MODEL=llama3.1:8b
 
-# Option 1: Ollama (Local)
-LLM_PROVIDER=ollama
+# === Task Specific Models ===
+# Grammar correction (Hugging Face)
+LLM_CORRECTION_MODEL=vennify/t5-base-grammar-correction
+# Translation (Hugging Face)
+LLM_TRANSLATION_MODEL=llama3.1:8b
+# Other specialized tasks
+LLM_REASONING_MODEL=llama3.1:8b
+LLM_SUMMARIZATION_MODEL=llama3.1:8b
+
+# --- Google Gemini Settings ---
+GOOGLE_API_KEY=your-google-api-key
+GEMINI_MODEL_NAME=gemini-2.5-flash
+
+# --- Ollama Settings ---
 OLLAMA_MODEL_NAME=llama3.1:8b
 
-# Option 2: Google Gemini
-# LLM_PROVIDER=google_genai
-# GOOGLE_API_KEY=your-google-api-key
-# GEMINI_MODEL_NAME=gemini-1.5-flash
-
-# Option 3: OpenAI
-# LLM_PROVIDER=openai
-# OPENAI_API_KEY=your-openai-api-key
-# OPENAI_MODEL_NAME=gpt-4o
-
-# Common settings
+# --- Common LLM Settings ---
 LLM_TEMPERATURE=0.7
+LLM_MAX_TOKENS=2048
+
+# --- Hugging Face Settings (for specialized models) ---
+# Required for grammar correction and translation models
 ```
 
 ### 3. Run Application
@@ -540,11 +555,12 @@ make all
 ## 📄 Key Features & Architecture
 
 - **Spring MVC Pattern**: Interface-implementation separation with dependency injection
-- **Multiple LLM Support**: Ollama (local), Google Gemini, OpenAI, Anthropic, Groq
+- **Multiple LLM Support**: Ollama (local), Google Gemini, OpenAI, Anthropic, Groq, Hugging Face
 - **Real-time Streaming**: Token-by-token responses via Server-Sent Events
 - **Security**: SecretStr API keys, input validation, error sanitization
 - **Thread Management**: Auto-generated labels, persistent conversations
 - **Modern UI**: Material-UI with dark/light themes and responsive design
+- **Specialized AI Services**: Grammar correction and translation using Hugging Face models
 
 ## 🎯 Summary
 
@@ -648,6 +664,7 @@ The following modules have comprehensive documentation:
   - **Text Correction**: Grammar, spelling, and clarity improvements using LLM
   - **Dependency Injection**: Follows DIP principles with automatic LLM provider injection
   - **Minimal & Clean**: Simplified implementation focusing on core functionality
+  - **Tool-Free LLM**: Uses LLM instances without tools to prevent interference
   - **Error Handling**: Comprehensive error handling with custom exceptions
   - **Usage Example**:
     ```python
@@ -665,6 +682,33 @@ The following modules have comprehensive documentation:
     fixed = reframer.correct("this funktoin dosnt work proprly")
     # Returns: "This function doesn't work properly"
     ```
+- **`mt5_service.py`**: **Specialized grammar correction and translation service**
+  - **Grammar Correction**: Uses vennify/t5-base-grammar-correction model for accurate grammar fixes
+  - **Translation**: Supports multilingual translation with mT5 models
+  - **Text Summarization**: Provides text summarization capabilities
+  - **Model Flexibility**: Configurable LLM models via environment variables
+  - **Fallback Handling**: Graceful degradation when correction models don't improve text
+  - **Dependency Injection**: Seamlessly integrated with the DI container
+  - **Tool-Free LLM**: Uses LLM instances without tools for optimal text processing
+  - **Usage Example**:
+    ```python
+    from app.core.di_container import inject
+    from app.utils.mt5_service import MT5Service
+    
+    # Using dependency injection
+    grammar_service = inject(MT5Service)
+    
+    # Grammar correction
+    corrected = grammar_service.correct_grammar("this sentence have grammer errors")
+    # Returns: "this sentence has grammar errors."
+    
+    # Translation
+    translated = grammar_service.translate("Hello world", "Spanish")
+    # Returns: "Hola mundo"
+    
+    # Summarization
+    summary = grammar_service.summarize("Long text to summarize...", max_length=100)
+    ```
 
 #### Service Layer (`app/services/`)
 - **`agent_service_interface.py`**: Agent service contracts (AgentServiceInterface, AgentExecutionInterface, ConversationStateInterface)
@@ -680,7 +724,10 @@ The following modules have comprehensive documentation:
 
 #### Agents Layer (`app/agents/`)
 - **`llm_provider_interface.py`**: LLM provider abstraction contracts
-- **`impl/llm_factory_impl.py`**: Factory implementation for Ollama/Gemini LLMs
+- **`impl/llm_factory_impl.py`**: Factory implementation for multiple LLM providers with tool management
+  - **Tool Management**: Enhanced with `with_tools` parameter to create LLM instances with or without tools
+  - **Hugging Face Support**: Added support for Hugging Face models like grammar correction and translation models
+  - **Multiple Provider Support**: Ollama, Google Gemini, OpenAI, Anthropic, Groq, Hugging Face
 
 #### API Layer (`app/routers/`)
 - **`AgenticRouter.py`**: AI agent and chat endpoints
@@ -719,15 +766,16 @@ With the Spring MVC structure, imports are significantly cleaner:
 # Old complex import paths
 from app.services.interfaces.agent_service_interface import AgentServiceInterface
 from app.repositories.interfaces.thread_repository_interface import ThreadRepositoryInterface
-from app.agents.interfaces.llm_provider_interface import LLMProviderInterface
+from app.agents.interfaces.llm_provider_interface import LLMFactoryInterface
 ```
 
 **After (Spring MVC Structure):**
+
 ```python
 # New clean import paths
 from app.services import AgentServiceInterface, UserServiceInterface
 from app.repositories import ThreadRepositoryInterface, DatabaseConnectionProvider
-from app.agents import LLMProviderInterface
+from app.agents import LLMFactoryInterface
 ```
 
 **Package [__init__.py](file:///Users/abhishek/Desktop/Coding/AgenticAI/app/__init__.py) Files:**
@@ -1042,7 +1090,7 @@ ModuleNotFoundError: No module named 'app'
 **Solutions**:
 1. **Set environment variables**:
    ```bash
-   export LLM_PROVIDER=ollama  # or google_genai, openai, anthropic, groq
+   export LLM_PROVIDER=ollama  # or google_genai, openai, anthropic, groq, huggingface
    export OLLAMA_MODEL_NAME=llama3.1:8b
    ```
 
@@ -1054,6 +1102,30 @@ ModuleNotFoundError: No module named 'app'
 3. **Verify Ollama is running**:
    ```bash
    curl http://localhost:11434/api/tags
+   ```
+
+**Issue**: `Hugging Face model loading errors`
+
+**Solutions**:
+1. **Ensure required dependencies are installed**:
+   ```bash
+   pip install langchain-huggingface transformers
+   ```
+
+2. **Set Hugging Face model names in .env**:
+   ```bash
+   # For grammar correction
+   LLM_CORRECTION_MODEL=vennify/t5-base-grammar-correction
+   
+   # For translation
+   LLM_TRANSLATION_MODEL=google/mt5-small
+   ```
+
+3. **Verify model availability**:
+   ```python
+   from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+   tokenizer = AutoTokenizer.from_pretrained("vennify/t5-base-grammar-correction")
+   model = AutoModelForSeq2SeqLM.from_pretrained("vennify/t5-base-grammar-correction")
    ```
 
 **Issue**: `Arguments missing for parameters "timeout", "stop"`
@@ -1303,7 +1375,7 @@ lsof -p $(pgrep -f "python.*app.main")
    # New correct imports
    from app.services import AgentServiceInterface
    from app.repositories import ThreadRepositoryInterface
-   from app.agents import LLMProviderInterface
+   from app.agents import LLMFactoryInterface
    
    # Avoid old import paths
    # from app.services.interfaces.agent_service_interface import AgentServiceInterface  # OLD
@@ -1419,7 +1491,7 @@ python -c "from app.agents.impl.llm_factory_impl import LLMFactoryImpl; from app
 python -c "from app.core.di_container import inject; from app.services import AgentServiceInterface; inject(AgentServiceInterface); print('DI OK')"
 
 # New import structure verification
-python -c "from app.services import AgentServiceInterface; from app.repositories import ThreadRepositoryInterface; from app.agents import LLMProviderInterface; print('Imports OK')"
+python -c "from app.services import AgentServiceInterface; from app.repositories import ThreadRepositoryInterface; from app.agents import LLMFactoryInterface; print('Imports OK')"
 
 # SecretStr functionality check
 python -c "from pydantic import SecretStr; print('SecretStr available:', SecretStr('test'))"
@@ -1556,5 +1628,17 @@ This project is licensed under the terms of the [LICENSE](LICENSE) file in this 
 - Resolved SecretStr type compatibility issues with LangChain models
 - Added missing parameters for ChatAnthropic initialization
 - Enhanced event handling for unrecognized SSE message types
+- Fixed DI container circular dependency issues with MT5Service
+
+#### 🧠 AI/LLM Enhancements
+- **Grammar Correction Service**: Added specialized MT5Service for accurate grammar correction using vennify/t5-base-grammar-correction model
+- **Hugging Face Integration**: Added support for Hugging Face models with proper tokenizer and model loading
+- **Model Flexibility**: Configurable LLM models for different tasks via environment variables
+- **Translation Support**: Added multilingual translation capabilities using mT5 models
+- **Text Summarization**: Added text summarization capabilities
+- **Fallback Handling**: Graceful degradation when correction models don't improve text quality
+- **Dependency Injection**: Seamless integration of AI services with DI container
+- **Tool Management**: Enhanced LLMFactory with `with_tools` parameter to create LLM instances with or without tools
+- **Tool-Free Text Processing**: ReframeChat and MT5Service now use tool-free LLM instances for optimal text correction performance
 
 *Built with ❤️ for developers who value clean code and modern architecture.*
