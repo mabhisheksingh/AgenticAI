@@ -102,7 +102,7 @@ class ReframeChat:
         if self._ollama_llm is None:
             try:
                 logger.debug("Creating Ollama LLM instance...")
-                self._ollama_llm = self._llm_provider.create_model(provider=LLMProvider.ollama)
+                self._ollama_llm = self._llm_provider.create_model(llm_provider_type=LLMProvider.LLM_CORRECTION_MODEL)
                 logger.debug("Ollama LLM instance created successfully")
             except Exception as e:
                 logger.error(f"Failed to create Ollama LLM: {e}")
@@ -150,6 +150,11 @@ class ReframeChat:
                 "You are a text correction assistant. Fix grammar, spelling, and clarity "
                 "in the given text while preserving the original meaning. Return ONLY the "
                 "corrected text with no additional explanation, commentary, or formatting."
+            )
+
+            system_prompt = (
+                "You are a grammar correction assistant."
+                "Reframe and correct grammar only, without changing meaning."
             )
             
             messages = [

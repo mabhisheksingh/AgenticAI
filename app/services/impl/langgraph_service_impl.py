@@ -23,6 +23,7 @@ from langgraph.graph import MessagesState, StateGraph
 from langgraph.types import StateSnapshot
 from langchain_core.runnables import RunnableConfig
 
+from app.core.enums import LLMProvider
 from app.services import (
     AgentExecutionInterface,
     ConversationStateInterface,
@@ -109,7 +110,7 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
         self._db_provider = db_provider
         
         # Initialize LLM and graph
-        self.llm = self._llm_provider.create_model()
+        self.llm = self._llm_provider.create_model(LLMProvider.LLM_MEDIUM_MODEL)
         # Compile hybrid graph with sync checkpointer
         state_graph = self.prepare_state_graph()
         checkpointer = self._get_sql_lite_memory()
@@ -268,6 +269,9 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
 
         # Initial metadata event
         yield f"data: {json.dumps({'threadId': str(thread_id), 'userId': user_id})}\n\n"
+
+        # User asked question
+        yield f"data: {json.dumps({'type': 'user','content': 'Got it 👍 you want ' + ' '.join(message)})}\n\n"
 
         try:
             # Ensure thread_id is not None at this point

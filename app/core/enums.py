@@ -61,10 +61,17 @@ class ErrorCode(str, Enum):
 
 
 class LLMProvider(str, Enum):
-    """Large Language Model provider enumeration.
-    
-    Supported LLM providers for the AI agent system. Each provider
-    requires specific configuration and has different capabilities.
-    """
-    google_genai = "google_genai"
-    ollama = "ollama"
+    # === Medium models
+    LLM_MEDIUM_MODEL = "LLM_MEDIUM_MODEL"
+    # === Large models
+    LLM_LARGE_MODEL = "LLM_LARGE_MODEL"
+    # === Small / Fast models
+    LLM_SMALL_MODEL = "LLM_SMALL_MODEL"
+    # === TINY models
+    LLM_TINY_MODEL = "LLM_TINY_MODEL"
+
+    # === Task Specific ===
+    LLM_CORRECTION_MODEL ="LLM_CORRECTION_MODEL"
+    LLM_TRANSLATION_MODEL ="LLM_TRANSLATION_MODEL"
+    LLM_REASONING_MODEL ="LLM_LARGE_MODEL"
+    LLM_SUMMARIZATION_MODEL ="LLM_SMALL_MODEL"

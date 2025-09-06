@@ -8,6 +8,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from langchain_core.language_models.chat_models import BaseChatModel
 
+from app.core.enums import LLMProvider
+
 
 class LLMProviderInterface(ABC):
     """Abstract interface for LLM provider factories.
@@ -18,10 +20,8 @@ class LLMProviderInterface(ABC):
     
     @abstractmethod
     def create_model(
-        self, 
-        provider: str | None = None, 
-        *,
-        model: str | None = None, 
+        self,
+        llm_provider_type: LLMProvider,
         temperature: float | None = None
     ) -> BaseChatModel:
         """Create a language model instance."""

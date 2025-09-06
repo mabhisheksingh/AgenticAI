@@ -30,6 +30,8 @@ uvicorn = {extras = ["standard"], version = "*"}
 langchain-ollama = "*"
 langgraph-checkpoint-sqlite = "*"
 langchain-google-genai = "*"
+langchain-groq = "*"
+langchain-anthropic = "*"
 
 [dev-packages]
 black = "*"
