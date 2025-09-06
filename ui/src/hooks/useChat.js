@@ -63,7 +63,7 @@ const useChat = (user_id, thread_id, setThread_id) => {
             }
             
             // Handle token streaming
-            if (obj?.type === 'token' && obj?.content) {
+            if ( (obj?.type === 'token'|| obj?.type === 'user' ) && obj?.content) {
               // Hide "Thinking..." on first token
               if (!firstTokenReceived) {
                 firstTokenReceived = true;
@@ -80,6 +80,9 @@ const useChat = (user_id, thread_id, setThread_id) => {
             } else if (obj?.type === 'error') {
               setError(obj.content || 'Streaming error occurred');
               setLoading(false);
+            } else {
+              // Handle any other unknown event types
+              console.log('Unknown event type received:', obj);
             }
           } catch {
             // Handle plain text fallback

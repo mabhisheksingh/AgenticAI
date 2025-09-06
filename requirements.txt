@@ -1,3 +1,5 @@
+langchain-groq
+langchain-anthropic
 langchain-google-genai
 langchain-core
 # ==============================

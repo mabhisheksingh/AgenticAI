@@ -1,204 +1,56 @@
 # AgenticAI - Full-Stack AI Chat Application
 
-A production-ready full-stack application featuring a **FastAPI backend** and **React frontend** for an Agentic AI system. Users can submit chat messages to AI agents, manage conversation threads, and interact with multiple LLM providers through a modern, responsive UI.
+A production-ready FastAPI backend with React frontend for agentic AI conversations. Features real-time streaming, multiple LLM providers, and modern architecture patterns.
 
 ## 🚀 Key Features
 
-### Backend (FastAPI)
-- **Versioned REST API** with centralized routing (`/v1/*`)
-- **Spring MVC Architecture** with interface-implementation separation
-- **Dependency Injection Container** following DIP principles
-- **Multiple LLM Support** (Ollama, Google Gemini) via factory pattern
-- **LangGraph Integration** for agent orchestration with checkpointing
-- **SQLite Persistence** with thread management and conversation history
-- **Token-Level Streaming** via Server-Sent Events (SSE) for real-time chat
-- **Text Correction Utility** with AI-powered grammar and spelling correction
-- **Global Error Handling** with standardized response formats
-- **Observability** with correlation IDs and request logging
-- **Developer Tooling** (Ruff, Black, mypy, pytest, pre-commit hooks)
+### Backend
+- **Versioned REST API** with Spring MVC architecture
+- **Multiple LLM Support**: Ollama, Google Gemini, OpenAI, Anthropic, Groq
+- **Real-time Streaming** via Server-Sent Events (SSE)
+- **SQLite Persistence** with thread management
+- **Dependency Injection** with type-safe resolution
+- **Security**: SecretStr API keys, input validation, error handling
 
-### Frontend (React + Vite)
-- **Modern Chat Interface** with Material-UI components
-- **Real-time Streaming** chat responses via Server-Sent Events (SSE)
-- **Thread Management** with sidebar navigation, labels, and auto-generation
-- **User Management** with dropdown selection and persistence
-- **Dark/Light Mode** toggle with localStorage persistence
-- **Responsive Design** optimized for desktop and mobile
-- **Error Boundaries** for graceful error handling
-- **Thread Label Preview** with live preview while typing
+### Frontend
+- **Modern Chat UI** with Material-UI components
+- **Real-time Streaming** responses
+- **Thread Management** with auto-generated labels
+- **Multi-user Support** with persistent sessions
+- **Dark/Light Mode** with responsive design
 
-## 🏢 Architecture Overview
+## 🏗️ Architecture
 
-### System Architecture
+### System Overview
 ```
-┌───────────────────────────────────────────────────────────────┐
-│                     Frontend (React + Vite)                  │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐ │
-│  │   Sidebar   │ │  Chat Area  │ │      User Selector      │ │
-│  │  (Threads)  │ │ (Messages)  │ │     (Dropdown)          │ │
-│  └─────────────┘ └─────────────┘ └─────────────────────────┘ │
-└───────────────────────────────────────────────────────────────┘
-                               │ HTTP/SSE
-                               ▼
-┌───────────────────────────────────────────────────────────────┐
-│                    Backend (FastAPI)                         │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐ │
-│  │   Routers   │ │  Services   │ │      Repositories       │ │
-│  │ (v1/user/*) │ │ (Business)  │ │     (Data Access)       │ │
-│  │ (v1/agent/*)│ │   Logic     │ │                         │ │
-│  └─────────────┘ └─────────────┘ └─────────────────────────┘ │
-│                               │                             │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐ │
-│  │ LLM Factory │ │ LangGraph   │ │       SQLite DB         │ │
-│  │ (Ollama/    │ │ (Agents)    │ │    (Persistence)        │ │
-│  │  Gemini)    │ │             │ │                         │ │
-│  └─────────────┘ └─────────────┘ └─────────────────────────┘ │
-└───────────────────────────────────────────────────────────────┘
+Frontend (React) ↔️ HTTP/SSE ↔️ FastAPI Backend ↔️ LLM Providers
+                                          │
+                                     SQLite DB
 ```
 
-### Data Flow
-1. **Frontend** → User interacts with chat interface
-2. **API Layer** → HTTP requests routed through versioned endpoints
-3. **Service Layer** → Business logic processes requests
-4. **LangGraph** → AI agents orchestrate LLM interactions
-5. **LLM Providers** → Generate AI responses (Ollama/Gemini)
-6. **Repository** → Data persisted in SQLite with thread management
-7. **Response** → Streaming or standard JSON responses to frontend
+### Key Components
+- **Services**: Business logic with dependency injection
+- **Repositories**: Data access layer (SQLite)
+- **Agents**: LLM provider abstractions (factory pattern)
+- **Routers**: REST API endpoints (`/v1/user/*`, `/v1/agent/*`)
 
-## 📁 Project Structure
-
-### Backend Structure
+### Project Structure
 ```
 app/
-  ├── core/                     # Core utilities and middleware
-  │   ├── enums.py              # APIVersion, RouterTag, ErrorCode, LLMProvider
-  │   ├── errors.py             # AppError, NotFoundError, ApiErrorItem
-  │   ├── exception_handlers.py # Global error handling
-  │   ├── middleware.py         # CorrelationID, Request logging
-  │   ├── response.py           # ok(), error(), paginate() helpers
-  │   └── di_container.py       # Dependency injection container
-  ├── services/                 # Service layer (Spring MVC pattern)
-  │   ├── __init__.py           # Interface exports
-  │   ├── agent_service_interface.py    # Agent service contracts
-  │   ├── user_service_interface.py     # User service contracts
-  │   └── impl/                 # Service implementations
-  │       ├── agent_service_impl.py     # Agent service implementation
-  │       ├── user_service_impl.py      # User service implementation
-  │       └── langgraph_service_impl.py # LangGraph orchestration
-  ├── repositories/             # Repository layer (Spring MVC pattern)
-  │   ├── __init__.py           # Interface exports
-  │   ├── thread_repository_interface.py    # Repository contracts
-  │   ├── database_interface.py             # Database contracts
-  │   └── impl/                 # Repository implementations
-  │       └── thread_repository_impl.py    # Thread/session CRUD
-  ├── agents/                   # AI/LLM integration (Spring MVC pattern)
-  │   ├── __init__.py           # Interface exports
-  │   ├── llm_provider_interface.py     # LLM provider contracts
-  │   └── impl/                 # Agent implementations
-  │       └── llm_factory_impl.py       # Factory for Ollama/Gemini LLMs
-  ├── routers/                  # API endpoint routers
-  │   ├── UserRouter.py         # /v1/user/* endpoints
-  │   └── AgenticRouter.py      # /v1/agent/* endpoints
-  ├── schemas/                  # Pydantic models
-  │   ├── ChatRequest.py        # Chat request/response schemas
-  │   └── chat.py               # Additional chat schemas
-  ├── utils/                    # Utility functions
-  │   ├── reframe_chat.py       # AI-powered text reframing service
-  │   └── text.py               # Text processing utilities
-  ├── config/                   # Configuration management
-  │   └── SqlLiteConfig.py      # SQLite connection singleton
-  ├── dispatch.py               # Router aggregation
-  ├── main.py                   # FastAPI app creation
-  └── db/                       # Database files
-      └── chat.db               # SQLite database
+├── agents/          # LLM provider factory
+├── core/            # DI container, errors, middleware
+├── repositories/    # Data access layer
+├── routers/         # API endpoints
+├── services/        # Business logic
+├── schemas/         # Pydantic models
+└── main.py          # FastAPI app
+
+ui/src/
+├── components/      # React components
+├── hooks/           # Custom hooks (useChat, useThreads)
+├── api/             # API integration
+└── utils/           # Utility functions
 ```
-
-#### Spring MVC Package Structure
-
-The backend follows **Spring MVC conventions** for clean separation of concerns:
-
-**Interface-Implementation Pattern:**
-- **Interfaces** are located in main packages (`services/`, `repositories/`, `agents/`)
-- **Implementations** are organized in `impl/` subfolders
-- **Dependency Injection** connects interfaces to implementations
-
-**Package Organization:**
-```python
-# Import interfaces from main packages
-from app.services import AgentServiceInterface, UserServiceInterface
-from app.repositories import ThreadRepositoryInterface, DatabaseConnectionProvider
-from app.agents import LLMProviderInterface
-
-# Implementations are accessed through DI container
-from app.core.di_container import inject
-agent_service = inject(AgentServiceInterface)
-```
-
-**Benefits of This Structure:**
-- **Interface Segregation Principle (ISP)**: Clean, focused interfaces
-- **Dependency Inversion Principle (DIP)**: High-level modules depend on abstractions
-- **Testability**: Easy to mock dependencies for unit testing
-- **Maintainability**: Clear separation between contracts and implementations
-- **Spring MVC Familiarity**: Java/Spring developers will find this structure familiar
-
-**Layer Responsibilities:**
-- **Services Layer**: Business logic and orchestration
-- **Repository Layer**: Data access and persistence
-- **Agents Layer**: AI/LLM provider abstraction
-- **Routers Layer**: HTTP endpoint handling and request routing
-
-### Dependency Injection (DI) Container
-
-The application implements a comprehensive dependency injection system that follows the **Dependency Inversion Principle (DIP)** for better testability, maintainability, and loose coupling.
-
-#### Key Features
-- **Type-Safe Resolution**: Automatic type checking and resolution
-- **Multiple Lifecycles**: Singleton, transient, and factory patterns
-- **Circular Dependency Detection**: Prevents infinite dependency loops
-- **Interface-Based**: All dependencies resolved through interfaces
-- **Comprehensive Error Handling**: Clear error messages for missing dependencies
-
-#### Service Registration Patterns
-
-```python
-from app.core.di_container import get_container, inject
-
-container = get_container()
-
-# Singleton: Single instance shared across application
-container.register_singleton(DatabaseConnectionProvider, SQLiteConnectionProvider())
-
-# Transient: New instance created for each resolution
-container.register_transient(LLMProviderInterface, LLMFactoryImpl)
-
-# Factory: Custom factory function for complex initialization
-def thread_repository_factory():
-    db_provider = container.resolve(DatabaseConnectionProvider)
-    return ThreadRepositoryImpl(db_provider)
-
-container.register_factory(ThreadRepositoryInterface, thread_repository_factory)
-
-# Utility services (e.g., ReframeChat)
-container.register_factory(ReframeChat, create_reframe_chat_service)
-```
-
-#### Using Dependency Injection
-
-**Option 1: Constructor Injection (Recommended)**
-```python
-from app.core.di_container import inject
-from app.utils.reframe_chat import ReframeChat
-
-# Service automatically gets all dependencies injected
-class MyService:
-    def __init__(self, reframer: ReframeChat = None):
-        self.reframer = reframer or inject(ReframeChat)
-    
-    def process_text(self, text: str) -> str:
-        return self.reframer.correct(text)
-```
-
-**Option 2: Direct Resolution**
 ```python
 # Direct resolution when needed
 reframer = inject(ReframeChat)
@@ -328,171 +180,90 @@ pipenv install --dev
 make install  # Detects pipenv/pip automatically
 ```
 
-## 🔧 Prerequisites
 
-## ✨ Recent Improvements & Features
-
-### 🚀 Token-Level Streaming
-- **Real-time Chat Experience**: Token-by-token streaming for immediate response feedback
-- **Server-Sent Events (SSE)**: Efficient streaming protocol for web applications
-- **Hybrid Architecture**: Combines LangGraph workflow management with direct LLM streaming
-- **Format**: `{"type": "token", "content": "..."}` for consistent frontend integration
-
-### 📦 Dependency Injection Improvements
-- **Spring MVC Architecture**: Clean interface-implementation separation
-- **Type-Safe Resolution**: Automatic dependency resolution with type checking
-- **Multiple Lifecycles**: Support for singleton, transient, and factory patterns
-- **Error Handling**: Clear error messages for missing or circular dependencies
-
-### 📝 Text Correction Utility
-- **AI-Powered Correction**: Uses LLM for grammar, spelling, and clarity improvements
-- **Dependency Injected**: Seamlessly integrates with the DI container
-- **Minimal & Clean**: Simplified implementation focusing on core functionality
-- **Production Ready**: Comprehensive error handling and logging
-
-### 📊 Thread Management Enhancements
-- **Auto-Generated Labels**: Thread names automatically generated from first message
-- **Label Preview**: Live preview of thread name while typing
-- **Thread Continuity**: Proper thread state management across conversations
-- **User Management**: Multi-user support with session isolation
-
-### 🛠️ Developer Experience
-- **Automated Quality Gates**: Pre-commit hooks, linting, formatting, type checking
-- **Make Commands**: Streamlined development workflow with auto-detection
-- **Comprehensive Documentation**: Google-style docstrings throughout codebase
-- **API Documentation**: Interactive Swagger UI and ReDoc interfaces
-
-### Backend Requirements
-- **Python 3.11+**
-- **pip** (and optionally pipenv)
-- **make** (recommended for convenience)
-
-### Frontend Requirements
-- **Node.js 18+**
-- **npm** (comes with Node.js)
-
-### LLM Provider Setup
-
-#### Option 1: Ollama (Local LLM)
-```bash
-# Install Ollama (macOS/Linux)
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull a model
-ollama pull llama3.1
-
-# Run server (usually auto-starts)
-ollama serve
-```
-
-#### Option 2: Google Gemini
-- Obtain a Google AI API key from [Google AI Studio](https://aistudio.google.com/)
 
 ## 🚀 Quick Start
 
-### 1. Clone Repository
+### Prerequisites
+
+**Required:**
+- Python 3.11+
+- Node.js 18+
+- npm
+
+**LLM Provider (choose one):**
+- **Ollama (Local)**: Install Ollama and pull a model like `llama3.1:8b`
+- **Google Gemini**: Get API key from [Google AI Studio](https://aistudio.google.com/)
+- **OpenAI**: Get API key from [OpenAI Platform](https://platform.openai.com/)
+- **Others**: Anthropic Claude or Groq (see environment setup)
+
+### 1. Setup
+
 ```bash
+# Clone repository
 git clone <your-repo-url> AgenticAI
 cd AgenticAI
-```
 
-### 2. Backend Setup
-
-#### Using venv (Recommended)
-```bash
+# Backend setup
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-pip install -r requirements-dev.txt
+
+# Frontend setup
+cd ui
+npm install
+cd ..
 ```
 
-#### Using pipenv (Alternative)
-```bash
-pipenv install --dev
-```
+### 2. Environment Configuration
 
-#### Using Make (Automatic Detection)
-```bash
-make install  # Automatically detects pipenv or falls back to pip
-```
-
-> **Note**: The `requirements.txt` includes optional dependencies for various LLM providers and vector databases. You only need to install the providers you plan to use. The core application requires `langchain-core`, `langchain-ollama`, `langchain-google-genai`, `langgraph`, `fastapi`, `uvicorn`, and `sqlite` dependencies.
-
-### 3. Environment Configuration
-
-Create a `.env` file in the repository root:
+Create `.env` file:
 
 ```env
-# --- Server Configuration ---
+# Server
 HOST=0.0.0.0
 PORT=8080
-
-# --- CORS Settings ---
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 
-# --- Database ---
-# SQLITE_DB_PATH=./app/db/chat.db  # Optional, defaults to app/db/chat.db
+# Choose ONE LLM provider:
 
-# --- LLM Provider Selection ---
-LLM_PROVIDER=ollama  # or 'google_genai'
-
-# --- Google Gemini Configuration ---
-# GOOGLE_API_KEY=your-google-api-key
-# GEMINI_MODEL_NAME=gemini-2.5-flash
-
-# --- Ollama Configuration ---
+# Option 1: Ollama (Local)
+LLM_PROVIDER=ollama
 OLLAMA_MODEL_NAME=llama3.1:8b
 
-# --- Common LLM Settings ---
+# Option 2: Google Gemini
+# LLM_PROVIDER=google_genai
+# GOOGLE_API_KEY=your-google-api-key
+# GEMINI_MODEL_NAME=gemini-1.5-flash
+
+# Option 3: OpenAI
+# LLM_PROVIDER=openai
+# OPENAI_API_KEY=your-openai-api-key
+# OPENAI_MODEL_NAME=gpt-4o
+
+# Common settings
 LLM_TEMPERATURE=0.7
 ```
 
-### 4. Run Backend
-
-#### Method 1: Make command (Recommended)
-```bash
-make run
-```
-
-#### Method 2: Make development mode
-```bash
-make dev
-```
-
-#### Method 3: Direct uvicorn
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
-```
-
-#### Method 4: Python module
-```bash
-python -m app.main
-```
-
-#### Method 5: Pipenv
-```bash
-pipenv run python -m app.main
-```
-
-### 5. Frontend Setup
+### 3. Run Application
 
 ```bash
+# Start backend (choose one method)
+make run              # Recommended
+# OR
+python -m app.main    # Direct
+
+# Start frontend (in new terminal)
 cd ui
-npm install
-
-# Create environment file (optional)
-echo "VITE_API_BASE_URL=http://localhost:8080" > .env
-echo "VITE_API_PATH=/v1" >> .env
-
-# Start development server
 npm run dev
 ```
 
-### 6. Access Application
+### 4. Access Application
 
 - **Frontend**: http://localhost:5173
-- **API Documentation**: http://localhost:8080/docs
-- **Alternative API Docs**: http://localhost:8080/redoc
+- **API Docs**: http://localhost:8080/docs
+
+
 
 ## 🔧 Development Commands
 
@@ -678,241 +449,46 @@ curl -X POST \
 }
 ```
 
-#### DELETE /v1/user/threads/{thread_id}
-**Purpose**: Delete a specific thread
+## 📡 API Reference
 
-**Path Parameters:**
-- `thread_id` (UUID): Thread identifier to delete
-
-**Headers:**
-- `user-id` (required): User session identifier
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "deleted": true,
-    "affected": 1
-  },
-  "meta": null
-}
-```
-
-#### PATCH /v1/user/rename-thread-label
-**Purpose**: Update the label of an existing thread
-
-**Query Parameters:**
-- `threadId` (UUID, required): Thread identifier
-- `label` (string, required): New label for the thread
-
-**Headers:**
-- `user-id` (required): User session identifier
-
-**Example:**
-```bash
-curl -X PATCH \
-  -H 'user-id: user123' \
-  'http://localhost:8080/v1/user/rename-thread-label?threadId=uuid&label=New%20Label'
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "updated": true,
-    "affected": 1
-  },
-  "meta": null
-}
-```
-
-#### DELETE /v1/user/{user_id}
-**Purpose**: Delete a user and all associated threads
-
-**Path Parameters:**
-- `user_id` (string): User identifier to delete
-
-**Headers:**
-- `user-id` (required): Admin user identifier
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "deleted": true,
-    "affected": 5
-  },
-  "meta": null
-}
-```
-
-### Error Handling
-
-#### Common Error Codes
-- `NOT_FOUND` (404): Resource not found
-- `VALIDATION_ERROR` (422): Invalid request data
-- `INTERNAL_ERROR` (500): Server error
-
-#### Error Response Examples
-
-**Validation Error:**
-```json
-[
-  {
-    "errorcode": "VALIDATION_ERROR",
-    "errormessage": "Field is required",
-    "errorStatus": 422,
-    "errorField": "message"
-  }
-]
-```
-
-**Not Found Error:**
-```json
-[
-  {
-    "errorcode": "NOT_FOUND",
-    "errormessage": "Thread not found",
-    "errorStatus": 404,
-    "errorField": null
-  }
-]
-```
-
-### Rate Limiting and Performance
-
-#### Streaming Responses
-- Chat endpoints use Server-Sent Events for real-time responses
-- Connection kept alive until `[DONE]` marker
-- Automatic reconnection supported by EventSource API
-
-#### Best Practices
-- Reuse thread IDs for continuing conversations
-- Use meaningful thread labels for better UX
-- Handle connection drops gracefully in client code
-- Monitor SSE events for proper message reconstruction
-
-### Interactive API Documentation
-
-#### Swagger UI
-Access interactive API documentation at [http://localhost:8080/docs](http://localhost:8080/docs)
-
-Features:
-- Try-it-out functionality for all endpoints
-- Request/response examples
-- Schema definitions
-- Authentication configuration
-
-#### ReDoc
-Alternative documentation interface at [http://localhost:8080/redoc](http://localhost:8080/redoc)
-
-Features:
-- Clean, readable documentation layout
-- Comprehensive schema information
-- Code examples in multiple languages
-- Hierarchical navigation
-
-
-
-### Authentication & Headers
-
-All requests require a `user-id` header:
+### Authentication
+All requests require `user-id` header:
 ```bash
 curl -H "user-id: your-user-id" ...
 ```
 
-### Chat Endpoints
+### Key Endpoints
 
 #### POST /v1/agent/chat
-Send a chat message to the AI agent.
+Send chat message with streaming response.
 
-**Headers:**
-- `user-id` (required): User identifier
-- `Content-Type: application/json`
-
-**Request Body:**
+**Request:**
 ```json
 {
-  "message": "Hello, how are you?",
-  "thread_id": "optional-thread-uuid",
-  "thread_label": "Optional thread name"
+  "message": "Hello!",
+  "thread_id": "optional-uuid",
+  "thread_label": "My Chat"
 }
 ```
 
-**Response:** Server-Sent Events (SSE) stream
+**Response:** Server-Sent Events (SSE)
 ```
 data: {"type": "token", "content": "Hello"}
-data: {"type": "token", "content": "!"}
 data: [DONE]
 ```
 
-### Thread Management Endpoints
-
 #### GET /v1/user/threads
-List all threads for a user.
-
-**Headers:**
-- `user-id` (required)
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "thread_id": "uuid",
-      "thread_label": "My Chat",
-      "created_at": "2024-01-01T00:00:00Z"
-    }
-  ]
-}
-```
-
-#### GET /v1/user/thread/{thread_id}
-Get detailed thread information with messages.
+List user's conversation threads.
 
 #### DELETE /v1/user/threads/{thread_id}
 Delete a specific thread.
 
-#### PATCH /v1/user/rename-thread-label
-Rename a thread's label.
+#### PATCH /v1/user/rename-thread-label?threadId={id}&label={name}
+Rename thread label.
 
-**Query Parameters:**
-- `threadId` (required): Thread UUID
-- `label` (required): New label
-
-### User Management Endpoints
-
-#### GET /v1/user/get-all
-Get all user IDs in the system.
-
-### Example Requests
-
-```bash
-# Send a chat message
-curl -X POST \
-  -H 'Content-Type: application/json' \
-  -H 'user-id: user-123' \
-  http://localhost:8080/v1/agent/chat \
-  -d '{"message":"Hello!"}'
-
-# List user threads
-curl -H 'user-id: user-123' \
-  http://localhost:8080/v1/user/threads
-
-# Delete a thread
-curl -X DELETE \
-  -H 'user-id: user-123' \
-  http://localhost:8080/v1/user/threads/thread-uuid
-
-# Rename thread
-curl -X PATCH \
-  -H 'user-id: user-123' \
-  'http://localhost:8080/v1/user/rename-thread-label?threadId=uuid&label=NewName'
-```
+### Interactive Documentation
+- **Swagger UI**: http://localhost:8080/docs
+- **ReDoc**: http://localhost:8080/redoc
 
 ## 🎨 Frontend Features
 
@@ -929,21 +505,69 @@ curl -X PATCH \
 - **Thread deletion** with confirmation
 - **Thread search and filtering**
 
-### User Experience
-- **User selection** dropdown with search functionality
-- **Dark/light mode** toggle with persistence
-- **Error boundaries** for graceful error handling
-- **Loading states** and progress indicators
-- **Keyboard shortcuts** for common actions
+## 🔧 Development
 
-### Technical Features
-- **Material-UI** components for consistent design
-- **Custom hooks** for state management (useChat, useThreads)
-- **Error handling** with user-friendly messages
-- **Local storage** for user preferences
-- **API integration** with proper error handling
+### Code Quality Commands
+```bash
+# Format and lint code
+make format
+make lint
 
-## 📚 Code Documentation
+# Type checking
+make type
+
+# Run tests
+make test
+
+# All quality checks
+make all
+```
+
+### Common Issues
+
+**LLM Provider Issues:**
+- Ensure Ollama is running: `ollama serve`
+- Check API keys are set correctly
+- Verify model names match your provider
+
+**CORS Issues:**
+- Set `CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173` in `.env`
+
+**Database Issues:**
+- Database auto-creates on first run
+- Check SQLite file permissions if needed
+
+## 📄 Key Features & Architecture
+
+- **Spring MVC Pattern**: Interface-implementation separation with dependency injection
+- **Multiple LLM Support**: Ollama (local), Google Gemini, OpenAI, Anthropic, Groq
+- **Real-time Streaming**: Token-by-token responses via Server-Sent Events
+- **Security**: SecretStr API keys, input validation, error sanitization
+- **Thread Management**: Auto-generated labels, persistent conversations
+- **Modern UI**: Material-UI with dark/light themes and responsive design
+
+## 🎯 Summary
+
+**AgenticAI** demonstrates modern full-stack development with:
+- **Clean Architecture**: SOLID principles with dependency injection
+- **Production Ready**: Error handling, logging, security best practices
+- **Developer Friendly**: Quality gates, documentation, easy setup
+- **Extensible**: Easy to add new LLM providers and features
+
+**Get started:** `git clone → make install → make run → open http://localhost:8080/docs`
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Follow code quality standards (`make all`)
+4. Commit changes (`git commit -m 'Add amazing feature'`)
+5. Push to branch (`git push origin feature/amazing-feature`)
+6. Open Pull Request
+
+---
+
+*Built with ❤️ for developers who value clean code and modern architecture.*
 
 ### Python Docstring Standards
 
@@ -1398,12 +1022,27 @@ ModuleNotFoundError: No module named 'app'
 
 #### LLM Provider Configuration
 
+**Issue**: `Expected type 'SecretStr | None', got 'str' instead`
+
+**Solutions**:
+1. **Upgrade to latest version**: Recent updates fixed SecretStr compatibility
+   ```bash
+   git pull origin main
+   pip install --upgrade -r requirements.txt
+   ```
+
+2. **Verify LangChain versions**:
+   ```bash
+   pip list | grep langchain
+   # Ensure compatible versions are installed
+   ```
+
 **Issue**: `RuntimeError: LLM_PROVIDER is not set`
 
 **Solutions**:
 1. **Set environment variables**:
    ```bash
-   export LLM_PROVIDER=ollama  # or google_genai
+   export LLM_PROVIDER=ollama  # or google_genai, openai, anthropic, groq
    export OLLAMA_MODEL_NAME=llama3.1:8b
    ```
 
@@ -1415,6 +1054,21 @@ ModuleNotFoundError: No module named 'app'
 3. **Verify Ollama is running**:
    ```bash
    curl http://localhost:11434/api/tags
+   ```
+
+**Issue**: `Arguments missing for parameters "timeout", "stop"`
+
+**Solutions**:
+1. **Update code**: Recent fixes added required ChatAnthropic parameters
+   ```python
+   # Fixed in latest version
+   return ChatAnthropic(
+       model_name=model_name,
+       api_key=SecretStr(api_key),
+       temperature=temp,
+       timeout=60,
+       stop=None
+   )
    ```
 
 **Issue**: `Google API key not configured`
@@ -1524,6 +1178,25 @@ ModuleNotFoundError: No module named 'app'
    const eventSource = new EventSource('/api/stream');
    eventSource.onopen = () => console.log('SSE connected');
    eventSource.onerror = (error) => console.error('SSE error:', error);
+   ```
+
+**Issue**: Unhandled events like `{"type": "user", "messages": "..."}`
+
+**Solutions**:
+1. **Update to latest version**: Recent fixes added proper event handling
+   ```bash
+   git pull origin main
+   cd ui && npm install
+   ```
+
+2. **Verify event handler**:
+   ```javascript
+   // Fixed in useChat.js
+   if (obj?.type === 'user') {
+     console.log('User message event received:', obj.messages || obj.content);
+   } else {
+     console.log('Unknown event type received:', obj);
+   }
    ```
 
 #### React Component Issues
@@ -1739,14 +1412,17 @@ curl http://localhost:8080/docs
 # Database connectivity
 python -c "from app.config.SqlLiteConfig import get_sql_lite_instance; print('DB OK')"
 
-# LLM connectivity 
-python -c "from app.agents.impl.llm_factory_impl import LLMFactoryImpl; LLMFactoryImpl().create_model(); print('LLM OK')"
+# LLM connectivity (updated for SecretStr compatibility)
+python -c "from app.agents.impl.llm_factory_impl import LLMFactoryImpl; from app.core.enums import LLMProvider; LLMFactoryImpl().create_model(LLMProvider.ollama); print('LLM OK')"
 
 # Dependency injection health
 python -c "from app.core.di_container import inject; from app.services import AgentServiceInterface; inject(AgentServiceInterface); print('DI OK')"
 
 # New import structure verification
 python -c "from app.services import AgentServiceInterface; from app.repositories import ThreadRepositoryInterface; from app.agents import LLMProviderInterface; print('Imports OK')"
+
+# SecretStr functionality check
+python -c "from pydantic import SecretStr; print('SecretStr available:', SecretStr('test'))"
 ```
 
 #### Common Log Patterns
@@ -1838,9 +1514,10 @@ This project is licensed under the terms of the [LICENSE](LICENSE) file in this 
 - **Developer Experience**: Make commands, pre-commit hooks, and comprehensive documentation
 - **Testing Ready**: Structured for easy unit testing with dependency injection
 - **Production Ready**: Error handling, logging, observability, and deployment guides
+- **Enhanced Security**: SecretStr API key protection and improved error handling
 
 ### 🔧 **Flexibility & Extensibility**
-- **Multiple LLM Support**: Easy to add new providers via factory pattern
+- **Multiple LLM Support**: Easy to add new providers via factory pattern (OpenAI, Google, Anthropic, Groq, Ollama)
 - **Lean Dependencies**: Optional packages for minimal installation footprint
 - **Configuration-Driven**: Environment-based configuration for different deployments
 - **Modern Stack**: FastAPI + React with TypeScript support
@@ -1852,5 +1529,32 @@ This project is licensed under the terms of the [LICENSE](LICENSE) file in this 
 - Rapid prototyping of AI-powered features
 
 **Get started in 5 minutes:** `git clone → make install → make run → open http://localhost:8080/docs`
+
+---
+
+## 📝 Changelog
+
+### Latest Updates (2024)
+
+#### 🔐 Security Enhancements
+- **SecretStr Integration**: All LLM API keys now use Pydantic SecretStr for enhanced security
+- **Type Safety**: Fixed LangChain compatibility issues with proper type annotations
+- **Parameter Validation**: Added comprehensive validation for ChatAnthropic and other providers
+
+#### 🎨 UI/UX Improvements
+- **Event Handling**: Enhanced SSE event processing for user-type and unknown events
+- **Error Messages**: Improved error display and debugging information
+- **Thread Management**: Better thread label preview and management
+
+#### 🛠️ Developer Experience
+- **Documentation**: Updated README with comprehensive troubleshooting guide
+- **Health Checks**: Enhanced diagnostic commands for better debugging
+- **Code Quality**: Improved error handling and type annotations throughout
+
+#### 🧪 Bug Fixes
+- Fixed `get_provider` static method signature in LLMFactory
+- Resolved SecretStr type compatibility issues with LangChain models
+- Added missing parameters for ChatAnthropic initialization
+- Enhanced event handling for unrecognized SSE message types
 
 *Built with ❤️ for developers who value clean code and modern architecture.*
