@@ -1,0 +1,17 @@
+# ==============================
+# Agentic AI Hugging Face Dependencies
+# ==============================
+# These dependencies are only needed if using Hugging Face models
+# They are installed separately to enable lazy loading
+
+# Hugging Face models and tokenizers
+transformers
+torch
+accelerate
+
+# Hugging Face integration
+langchain-huggingface
+
+# Embeddings / tokenization
+sentence-transformers
+tiktoken

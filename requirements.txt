@@ -1,7 +1,3 @@
-langchain-groq
-langchain-anthropic
-langchain-google-genai
-langchain-core
 # ==============================
 # Agentic AI Runtime Dependencies
 # ==============================
@@ -9,13 +5,15 @@ langchain-core
 #       Keep only the providers/vector db you actually use to keep the env lean.
 
 # Agentic / LLM framework
+langgraph-checkpoint-sqlite
 langgraph
 langchain
 langchain-community
 langsmith
 langchain-openai
 langchain-ollama
-langchain-huggingface
+# Hugging Face integration (optional - install separately with requirements-huggingface.txt)
+# langchain-huggingface
 
 # Model providers (install only those you need)
 openai
@@ -24,13 +22,13 @@ google-generativeai
 groq
 litellm
 
-# Hugging Face models and tokenizers
-transformers
-torch
+# Hugging Face models and tokenizers (optional - install separately with requirements-huggingface.txt)
+# transformers
+# torch
 
-# Embeddings / tokenization
-sentence-transformers
-tiktoken
+# Embeddings / tokenization (optional - install separately with requirements-huggingface.txt)
+# sentence-transformers
+# tiktoken
 
 # Vector db (pick 1–2)
 chromadb

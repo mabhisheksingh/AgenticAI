@@ -6,13 +6,14 @@ including streaming chat responses and conversation management.
 Uses dependency injection following DIP principles.
 """
 from __future__ import annotations
-
+import logging
 from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Header, Depends
 from fastapi.responses import StreamingResponse
 
+from app.utils import ReframeChat
 from app.utils.mt5_service import MT5Service
 from app.core.enums import RouterTag, LLMProvider
 from app.schemas.ChatRequest import ChatRequest
@@ -21,7 +22,7 @@ from app.core.di_container import inject
 
 
 agentic_router = APIRouter(prefix="/agent", tags=[RouterTag.agent.value])
-
+logger = logging.getLogger(__name__)
 
 def get_agent_service() -> AgentServiceInterface:
     """Dependency injection for AgentService.
@@ -127,9 +128,10 @@ async def create_and_update_chat(
     message: str = body.message
     thread_id: Optional[UUID | None] = body.thread_id
     thread_label: str = body.thread_label  # Now mandatory
-
-    message = mt5_service.correct_grammar(message)
-    response = agent_service.stream_chat_tokens(user_id, thread_id, message, thread_label)
+    message =  inject(ReframeChat).correct(message)
+    logger.info(f"Corrected message: {message}")
+    response = agent_service.stream_chat_tokens(user_id=user_id,thread_id= thread_id,
+                                                message=message,thread_label= thread_label)
     return StreamingResponse(
         response,
         media_type="text/event-stream",

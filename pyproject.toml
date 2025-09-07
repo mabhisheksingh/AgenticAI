@@ -1,7 +1,7 @@
 [tool.black]
 line-length = 100
 target-version = ["py311"]
-extend-exclude = "^/(venv|.venv|.git|dist|build|.mypy_cache|.ruff_cache|.pytest_cache)/"
+extend-exclude = "^/(venv|.venv|.git|dist|build|.mypy_cache|.ruff_cache|.pytest_cache|scripts)/"
 
 [tool.isort]
 profile = "black"
@@ -26,6 +26,7 @@ exclude = [
   ".mypy_cache",
   ".pytest_cache",
   ".ruff_cache",
+  "scripts",
 ]
 
 [tool.ruff.lint.isort]

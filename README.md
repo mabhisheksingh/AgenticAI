@@ -11,7 +11,8 @@ A production-ready FastAPI backend with React frontend for agentic AI conversati
 - **SQLite Persistence** with thread management
 - **Dependency Injection** with type-safe resolution
 - **Security**: SecretStr API keys, input validation, error handling
-- **Specialized AI Services**: Grammar correction, translation, and text summarization
+- **Specialized AI Services**: Grammar correction, translation, and text summarization (optional Hugging Face support)
+- **Lazy Loading**: Hugging Face dependencies only loaded when needed
 
 ### Frontend
 - **Modern Chat UI** with Material-UI components
@@ -47,13 +48,14 @@ app/
 ├── schemas/         # Pydantic models
 └── main.py          # FastAPI app
 
-ui/src/
+ui/
 ├── components/      # React components
 ├── hooks/           # Custom hooks (useChat, useThreads)
 ├── api/             # API integration
 └── utils/           # Utility functions
 ```
-```python
+
+```
 # Direct resolution when needed
 reframer = inject(ReframeChat)
 corrected_text = reframer.correct("bad grammer text")
@@ -130,7 +132,7 @@ The application uses a **lean dependency approach** with the following core requ
 - SQLite (built-in Python) - No additional dependencies required
 
 ### Optional Dependencies
-The `requirements.txt` includes many **optional dependencies** for extended functionality:
+The application supports optional dependencies for extended functionality:
 
 ```bash
 # Optional LLM Providers (install only what you need)
@@ -143,6 +145,14 @@ litellm            # Multi-provider LLM interface
 chromadb           # Chroma vector database
 qdrant-client      # Qdrant vector database
 
+# Optional Hugging Face Support (for grammar correction, translation, summarization)
+# Install separately with: pip install -r requirements-huggingface.txt
+# - transformers
+# - torch
+# - langchain-huggingface
+# - sentence-transformers
+# - tiktoken
+
 # Optional Features
 redis              # Caching/session storage
 sse-starlette      # Server-sent events
@@ -151,7 +161,7 @@ orjson             # Fast JSON serialization
 ```
 
 ### Dependency Optimization
-> **💡 Optimization Tip**: For a **minimal installation**, you can create a custom `requirements-minimal.txt` with only the core dependencies listed above. The application is designed to work with just the essential packages.
+> **💡 Optimization Tip**: For a **minimal installation**, you can use `requirements-minimal.txt` which excludes Hugging Face dependencies. The application will gracefully disable Hugging Face features when these dependencies are not available.
 
 ### Development Dependencies
 ```bash
@@ -167,17 +177,22 @@ pre-commit         # Git hooks
 
 ### Installation Methods
 
-#### Method 1: Full Installation
+#### Method 1: Full Installation (with Hugging Face support)
 ```bash
-pip install -r requirements.txt -r requirements-dev.txt
+pip install -r requirements.txt -r requirements-huggingface.txt -r requirements-dev.txt
 ```
 
-#### Method 2: Pipenv (Recommended)
+#### Method 2: Minimal Installation (without Hugging Face support)
+```bash
+pip install -r requirements-minimal.txt -r requirements-dev.txt
+```
+
+#### Method 3: Pipenv (Recommended)
 ```bash
 pipenv install --dev
 ```
 
-#### Method 3: Make Command (Auto-detection)
+#### Method 4: Make Command (Auto-detection)
 ```bash
 make install  # Detects pipenv/pip automatically
 ```
@@ -195,37 +210,84 @@ make install  # Detects pipenv/pip automatically
 
 **LLM Provider (choose one):**
 - **Ollama (Local)**: Install Ollama and pull a model like `llama3.1:8b`
-- **Google Gemini**: Get API key from [Google AI Studio](https://aistudio.google.com/)
-- **OpenAI**: Get API key from [OpenAI Platform](https://platform.openai.com/)
-- **Hugging Face Models**: For specialized tasks like grammar correction and translation
-- **Others**: Anthropic Claude or Groq (see environment setup)
+- **Google Gemini**: Get an API key from Google AI Studio
+- **OpenAI**: Get an API key from OpenAI
+- **Anthropic**: Get an API key from Anthropic
+- **Groq**: Get an API key from Groq
 
-### 1. Setup
+### Installation
 
-```bash
-# Clone repository
-git clone <your-repo-url> AgenticAI
-cd AgenticAI
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd AgenticAI
+   ```
 
-# Backend setup
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+2. **Set up Python environment**:
+   ```bash
+   # Using pipenv (recommended)
+   pipenv install --dev
+   pipenv shell
+   
+   # Or using pip with virtual environment
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   # For full features (including Hugging Face):
+   pip install -r requirements.txt -r requirements-huggingface.txt -r requirements-dev.txt
+   # For minimal installation (without Hugging Face):
+   pip install -r requirements-minimal.txt -r requirements-dev.txt
+   ```
 
-# Frontend setup
-cd ui
-npm install
-cd ..
-```
+3. **Set up frontend dependencies**:
+   ```bash
+   cd ui
+   npm install
+   cd ..
+   ```
+
+4. **Configure environment variables**:
+   Copy `.env.example` to `.env` and configure your settings:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your preferred settings
+   ```
+
+5. **Run the application**:
+   
+   **Option 1: Run both services in separate terminals**
+   ```bash
+   # Terminal 1: Start the backend
+   python -m app.main
+   
+   # Terminal 2: Start the frontend development server
+   cd ui
+   npm run dev
+   ```
+   
+   **Option 2: Run backend only**
+   ```bash
+   python -m app.main
+   ```
+   
+   **Option 3: Run frontend only (connects to backend on localhost:8000)**
+   ```bash
+   cd ui
+   npm run dev
+   ```
+
+6. **Access the application**:
+   - **Frontend**: http://localhost:5173
+   - **Backend API**: http://localhost:8000
+   - **API Docs**: http://localhost:8000/docs
 
 ### 2. Environment Configuration
 
 Create `.env` file:
 
-```env
+``env
 # Server
 HOST=0.0.0.0
-PORT=8080
+PORT=8000
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 
 # === LLM Provider Selection ===
@@ -262,6 +324,7 @@ LLM_MAX_TOKENS=2048
 
 ### 3. Run Application
 
+#### Option 1: Manual Setup
 ```bash
 # Start backend (choose one method)
 make run              # Recommended
@@ -273,10 +336,23 @@ cd ui
 npm run dev
 ```
 
+#### Option 2: Docker Setup
+```bash
+# Build and run with Docker Compose (separate containers)
+docker-compose up --build
+
+# For a simpler setup without Ollama
+docker-compose -f docker-compose.simple.yml up --build
+
+# Build and run with single container (backend + frontend)
+docker build -t agenticai .
+docker run -p 8000:8000 --env-file .env agenticai
+```
+
 ### 4. Access Application
 
-- **Frontend**: http://localhost:5173
-- **API Docs**: http://localhost:8080/docs
+- **Frontend**: http://localhost:5173 (development) or http://localhost:8000 (Docker)
+- **API Docs**: http://localhost:8000/docs
 
 
 
@@ -307,6 +383,9 @@ make all
 
 # Clean cache and temporary files
 make clean
+
+# Build and run with Docker (separate containers)
+make docker-simple
 ```
 
 ### Project Management
@@ -319,6 +398,12 @@ make run
 
 # Run application in development mode (with reload)
 make dev
+
+# Build and run with Docker
+make docker
+
+# Build and run with simplified Docker setup
+make docker-simple
 ```
 
 > **Note**: All commands automatically detect if you're using pipenv and run within the virtual environment.
@@ -523,19 +608,48 @@ Rename thread label.
 ## 🔧 Development
 
 ### Code Quality Commands
+
+#### Documentation Standards
+
+**Python Documentation**
+All Python code follows comprehensive docstring standards:
+- **Google-style docstrings** for consistency
+- **Type hints** for all function parameters and returns
+- **Usage examples** in docstrings where helpful
+- **Error documentation** for exceptions that may be raised
+
+**Code Documentation Philosophy**
+- **Self-documenting code**: Clear variable and function names
+- **Comprehensive docstrings**: Every public function and class documented
+- **Inline comments**: Complex logic explained with comments
+- **Architecture documentation**: High-level system design explained
+
+#### Quality Tools
+
 ```bash
-# Format and lint code
+# Format code and fix import order
 make format
+
+# Lint with Ruff and auto-fix issues
 make lint
 
-# Type checking
+# Type check with mypy
 make type
 
-# Run tests
+# Security scan with Bandit
+make security
+
+# Run tests with pytest
 make test
 
-# All quality checks
+# Run all quality gates
 make all
+
+# Install pre-commit hooks
+make hooks
+
+# Run health check
+python scripts/health-check.py
 ```
 
 ### Common Issues
@@ -960,13 +1074,9 @@ ls -la app/db/
 
 #### Backend
 ```bash
-# Using Docker (recommended)
-docker build -t agentic-ai-backend .
-docker run -p 8080:8080 agentic-ai-backend
-
-# Or direct deployment
+# Direct deployment
 pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8080
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 #### Frontend
@@ -996,6 +1106,8 @@ npm run preview
    - Monitor resource usage
    - Track error rates
 
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ## 🧪 Testing
 
 ### Backend Testing
@@ -1014,6 +1126,18 @@ pytest tests/test_agents.py
 ```bash
 cd ui
 npm test
+```
+
+### Docker Testing
+```bash
+# Test Docker build process
+./scripts/test-docker.sh
+```
+
+### Health Check
+```bash
+# Run application health check
+python scripts/health-check.py
 ```
 
 ## 🛠️ Comprehensive Troubleshooting
@@ -1604,41 +1728,61 @@ This project is licensed under the terms of the [LICENSE](LICENSE) file in this 
 
 ---
 
-## 📝 Changelog
+## 🐳 Docker Deployment
 
-### Latest Updates (2024)
+This project includes Docker support for flexible deployment options.
 
-#### 🔐 Security Enhancements
-- **SecretStr Integration**: All LLM API keys now use Pydantic SecretStr for enhanced security
-- **Type Safety**: Fixed LangChain compatibility issues with proper type annotations
-- **Parameter Validation**: Added comprehensive validation for ChatAnthropic and other providers
+### Docker Files
+- `Dockerfile`: Multi-stage Dockerfile that builds both backend and frontend in a single container
+- `Dockerfile.backend`: Backend service Dockerfile with integrated frontend build (deprecated)
+- `ui/Dockerfile`: Frontend service Dockerfile (deprecated)
 
-#### 🎨 UI/UX Improvements
-- **Event Handling**: Enhanced SSE event processing for user-type and unknown events
-- **Error Messages**: Improved error display and debugging information
-- **Thread Management**: Better thread label preview and management
+### Running with Docker
 
-#### 🛠️ Developer Experience
-- **Documentation**: Updated README with comprehensive troubleshooting guide
-- **Health Checks**: Enhanced diagnostic commands for better debugging
-- **Code Quality**: Improved error handling and type annotations throughout
+#### Option 1: Single Container (Backend + Frontend) - Recommended
+```bash
+# Build the single container
+docker build -t agenticai .
 
-#### 🧪 Bug Fixes
-- Fixed `get_provider` static method signature in LLMFactory
-- Resolved SecretStr type compatibility issues with LangChain models
-- Added missing parameters for ChatAnthropic initialization
-- Enhanced event handling for unrecognized SSE message types
-- Fixed DI container circular dependency issues with MT5Service
+# Run the container with external .env file
+docker run -p 8000:8000 --env-file .env -v $(pwd)/app/db:/app/app/db agenticai
+```
 
-#### 🧠 AI/LLM Enhancements
-- **Grammar Correction Service**: Added specialized MT5Service for accurate grammar correction using vennify/t5-base-grammar-correction model
-- **Hugging Face Integration**: Added support for Hugging Face models with proper tokenizer and model loading
-- **Model Flexibility**: Configurable LLM models for different tasks via environment variables
-- **Translation Support**: Added multilingual translation capabilities using mT5 models
-- **Text Summarization**: Added text summarization capabilities
-- **Fallback Handling**: Graceful degradation when correction models don't improve text quality
-- **Dependency Injection**: Seamless integration of AI services with DI container
-- **Tool Management**: Enhanced LLMFactory with `with_tools` parameter to create LLM instances with or without tools
-- **Tool-Free Text Processing**: ReframeChat and MT5Service now use tool-free LLM instances for optimal text correction performance
+#### Option 2: Separate Containers with Docker Compose
+```bash
+# Build and run services
+docker-compose up --build
+
+# Run in detached mode
+docker-compose up -d --build
+
+# Stop services
+docker-compose down
+```
+
+### Docker Environment Variables
+
+The Docker setup uses environment variables from both the project root `.env` file (for backend) and `ui/.env` file (for frontend build-time configuration).
+
+**Backend Environment Variables (.env):**
+- API keys for LLM providers (GOOGLE_API_KEY, OPENAI_API_KEY, etc.)
+- Database configuration
+- Server settings (HOST, PORT, CORS_ORIGINS)
+
+**Frontend Environment Variables (ui/.env):**
+- VITE_API_BASE_URL: Backend server URL (default: http://localhost:8080)
+- VITE_API_PATH: API path prefix (default: /v1)
+- VITE_REQUEST_TIMEOUT_MS: Request timeout in milliseconds
+
+Both `.env` files are automatically loaded when running Docker containers. You can modify these files to configure your deployment.
+
+For persistent data, the container mounts the `app/db` directory to store SQLite database files.
+
+### Accessing the Application
+
+After starting the Docker containers:
+- **Frontend**: http://localhost:8000 (served by backend)
+- **Backend API**: http://localhost:8080
+- **API Docs**: http://localhost:8080/docs
 
 *Built with ❤️ for developers who value clean code and modern architecture.*
