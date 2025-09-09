@@ -11,15 +11,8 @@ import logging
 import os
 
 from dotenv import load_dotenv
-from langchain_huggingface import HuggingFacePipeline
 from pydantic import SecretStr
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_ollama import ChatOllama
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from langchain_groq import ChatGroq
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
 
 from app.agents.tools.combined_tools import get_combined_tools
 from app.core.enums import LLMProvider
@@ -86,6 +79,14 @@ class LLMFactoryImpl(LLMFactoryInterface):
         llm:BaseChatModel
         try:
             if provider == "openai":
+                # Lazy load OpenAI dependencies only when needed
+                try:
+                    from langchain_openai import ChatOpenAI
+                except ImportError as e:
+                    raise ImportError(
+                        "OpenAI dependencies not found. Please ensure langchain-openai is installed."
+                    ) from e
+                
                 api_key = os.getenv("OPENAI_API_KEY")
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY is not set")
@@ -96,6 +97,14 @@ class LLMFactoryImpl(LLMFactoryInterface):
                     timeout=timeout
                 )
             elif provider == "google":
+                # Lazy load Google dependencies only when needed
+                try:
+                    from langchain_google_genai import ChatGoogleGenerativeAI
+                except ImportError as e:
+                    raise ImportError(
+                        "Google Generative AI dependencies not found. Please ensure langchain-google-genai is installed."
+                    ) from e
+                
                 api_key = os.getenv("GOOGLE_API_KEY")
                 if not api_key:
                     raise ValueError("GOOGLE_API_KEY is not set")
@@ -106,6 +115,14 @@ class LLMFactoryImpl(LLMFactoryInterface):
                     timeout=timeout
                 )
             elif provider == "anthropic":
+                # Lazy load Anthropic dependencies only when needed
+                try:
+                    from langchain_anthropic import ChatAnthropic
+                except ImportError as e:
+                    raise ImportError(
+                        "Anthropic dependencies not found. Please ensure langchain-anthropic is installed."
+                    ) from e
+                
                 api_key = os.getenv("ANTHROPIC_API_KEY")
                 if not api_key:
                     raise ValueError("ANTHROPIC_API_KEY is not set")
@@ -117,6 +134,14 @@ class LLMFactoryImpl(LLMFactoryInterface):
                     stop=None
                 )
             elif provider == "groq":
+                # Lazy load Groq dependencies only when needed
+                try:
+                    from langchain_groq import ChatGroq
+                except ImportError as e:
+                    raise ImportError(
+                        "Groq dependencies not found. Please ensure langchain-groq is installed."
+                    ) from e
+                
                 api_key = os.getenv("GROQ_API_KEY")
                 if not api_key:
                     raise ValueError("GROQ_API_KEY is not set")
@@ -126,12 +151,30 @@ class LLMFactoryImpl(LLMFactoryInterface):
                     timeout=timeout
                 )
             elif provider == "ollama":
+                # Lazy load Ollama dependencies only when needed
+                try:
+                    from langchain_ollama import ChatOllama
+                except ImportError as e:
+                    raise ImportError(
+                        "Ollama dependencies not found. Please ensure langchain-ollama is installed."
+                    ) from e
+                
                 llm = ChatOllama(
                     model=model_name,
                     stop=stop,
                     temperature=temp
                 )
             elif provider == "huggingface":
+                # Lazy load Hugging Face dependencies only when needed
+                try:
+                    from langchain_huggingface import HuggingFacePipeline
+                    from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
+                except ImportError as e:
+                    raise ImportError(
+                        "Hugging Face dependencies not found. Please install them with: "
+                        "pip install -r requirements-huggingface.txt"
+                    ) from e
+                
                 # load tokenizer + model
                 model_id = model_name
                 tokenizer = AutoTokenizer.from_pretrained(model_id)
