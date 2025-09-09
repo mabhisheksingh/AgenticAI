@@ -38,6 +38,7 @@ ddgs = "*"
 transformers = "*"
 torch = "*"
 langchain-huggingface = "*"
+langchain-openai = "*"
 
 [dev-packages]
 black = "*"
