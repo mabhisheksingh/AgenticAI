@@ -39,6 +39,9 @@ transformers = "*"
 torch = "*"
 langchain-huggingface = "*"
 langchain-openai = "*"
+langchain-tavily = "*"
+langchain-experimental = "*"
+matplotlib = "*"
 
 [dev-packages]
 black = "*"

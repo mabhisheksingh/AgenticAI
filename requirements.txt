@@ -1,3 +1,5 @@
+langchain-tavily
+langchain-core
 # ==============================
 # Agentic AI Runtime Dependencies
 # ==============================

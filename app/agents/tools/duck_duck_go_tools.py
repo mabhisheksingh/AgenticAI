@@ -3,14 +3,18 @@ from langchain_core.tools import tool
 
 
 @tool
-def search_from_internet(query: str) -> str:
-    """Search the internet for latest information using DuckDuckGo.
-    
-    Args:
-        query: The search query to look up on the internet
-        
-    Returns:
-        str: Search results from DuckDuckGo
+def search_the_web(query: str) -> str:
     """
+      Searches the internet for up-to-date, real-time information.
+
+      Use this tool for questions about current events, latest news, weather conditions, sports scores,
+      stock prices, or any other query that requires information not available in the model's training data.
+
+      Args:
+          query: The specific search query for the internet.
+
+      Returns:
+          str: A summary of the search results from the internet.
+      """
     ddg_tool = DuckDuckGoSearchResults(max_results=5)
     return ddg_tool.run(query)
