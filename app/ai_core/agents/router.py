@@ -7,6 +7,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 from app.ai_core.llm_factory.llm_factory_interface import LLMFactoryInterface
+from app.ai_core.prompts.common_prompts import build_conversation_summary_prompt
 from app.core.di_container import inject
 from app.core.enums import LLMProvider
 from app.schemas.custom_state import CustomState
