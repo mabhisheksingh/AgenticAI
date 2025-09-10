@@ -1,0 +1,6 @@
+data: {"threadId": "bc52403b-31a4-4de9-8666-369a313d0ff3", "userId": "test-user-2"}
+
+data: {"type": "user", "content": "Got it \ud83d\udc4d you want What is the weather in New York today?"}
+
+data: [DONE]
+

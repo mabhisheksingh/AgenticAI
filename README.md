@@ -5,7 +5,7 @@ A production-ready FastAPI backend with React frontend for agentic AI conversati
 ## 🚀 Key Features
 
 ### Backend
-- **Versioned REST API** with Spring MVC architecture
+- **Versioned REST API** with FastAPI architecture
 - **Multiple LLM Support**: Ollama, Google Gemini, OpenAI, Anthropic, Groq, Hugging Face
 - **Real-time Streaming** via Server-Sent Events (SSE)
 - **SQLite Persistence** with thread management
@@ -20,6 +20,77 @@ A production-ready FastAPI backend with React frontend for agentic AI conversati
 - **Thread Management** with auto-generated labels
 - **Multi-user Support** with persistent sessions
 - **Dark/Light Mode** with responsive design
+
+## 🧠 Multi-Agent Routing & Query Decomposition (Latest Architecture)
+
+### Overview
+AgenticAI features a **plan-and-dispatch multi-agent router** for robust multi-step, multi-domain query handling. Complex user queries are decomposed into atomic sub-queries using an LLM, and each sub-query is routed to the most appropriate specialized agent (math, code, research). This enables accurate, modular, and collaborative agent workflows.
+
+### How It Works
+1. **LLM-Based Query Decomposition**
+    - The router uses a dedicated LLM (configurable via provider) to split complex user queries into minimal, non-overlapping sub-questions.
+    - Example: "Who is the current PM of India and write a Java code for prime number?" →
+      - "Who is the current PM of India?" (→ research agent)
+      - "How do I write Java code to find prime numbers?" (→ code agent)
+      - "Show a Java function that checks if a number is prime." (→ code agent)
+
+2. **Routing Plan Construction**
+    - The router builds a `routing_plan`: a list of (agent, subquery) pairs (only agents: math, code, research).
+    - The plan is tracked in the conversation state (`CustomState`) as `routing_plan`, `pending_routes`, and a `plan_active` flag.
+
+3. **Plan-and-Dispatch Orchestration**
+    - The router dispatches each sub-query in sequence:
+        - Pops the next (agent, subquery) from the plan.
+        - Appends the subquery as a new HumanMessage.
+        - Sets the route for the StateGraph to invoke the correct agent.
+    - After each agent responds, control returns to the router to dispatch the next subquery, until the plan is exhausted.
+    - If an agent invokes tools, the graph will route to the tools node and then back to the same agent, until the agent completes.
+
+4. **Final Formatting**
+    - When all sub-queries are processed, the router routes to the `nlp_formatting` node.
+    - The formatting agent robustly handles agent outputs (including lists) and produces a clean, user-facing answer.
+
+### State Fields Used
+- `route`: Current agent to invoke (math, code, research, nlp_formatting)
+- `routing_plan`: List of (agent, subquery) pairs
+- `pending_routes`: List of remaining agent types to invoke
+- `plan_active`: True if a plan is being executed
+- `messages`: Conversation history (with reducers for streaming)
+- `summary`: Conversation summary (with safe reducer)
+
+### StateGraph Flow Example
+```
+User Query → router
+  ├─> router splits query with LLM → builds routing_plan
+  ├─> router dispatches subquery #1 → research
+  │     └─> research result → router
+  ├─> router dispatches subquery #2 → code
+  │     └─> code result → router
+  ├─> router dispatches subquery #3 → code
+  │     └─> code result → router
+  └─> routing_plan exhausted → router sets route to nlp_formatting
+        └─> nlp_formatting produces final answer
+```
+
+### Implementation Notes
+- **No Simulation AIMessage:** The router does not emit concatenated simulation strings. Each subquery is dispatched as a true message for agent execution.
+- **Agents route back to router:** After each agent completes (unless tools are invoked), the StateGraph returns to the router for the next dispatch.
+- **Formatting agent is robust:** Handles AIMessage.content as string, list, or dict.
+- **No direct agent → nlp_formatting edges:** Final formatting only occurs after all plan steps are complete.
+- **No supervisor agent:** All orchestration is handled by the router and StateGraph.
+- **No Spring MVC:** Backend is FastAPI-based.
+- **No "web" agent node:** While `should_route_to_web` exists, there is no explicit web agent node in the StateGraph.
+
+### Example State (Partial)
+```python
+{
+    'route': 'code',
+    'routing_plan': [('code', 'How do I write Java code to find prime numbers?'), ...],
+    'plan_active': True,
+    'messages': [HumanMessage(...), AIMessage(...), ...],
+    ...
+}
+```
 
 ## 🏗️ Architecture
 
@@ -134,7 +205,7 @@ The application uses a **lean dependency approach** with the following core requ
 ### Optional Dependencies
 The application supports optional dependencies for extended functionality:
 
-```bash
+```
 # Optional LLM Providers (install only what you need)
 openai              # OpenAI GPT models
 anthropic          # Anthropic Claude models
@@ -146,7 +217,7 @@ chromadb           # Chroma vector database
 qdrant-client      # Qdrant vector database
 
 # Optional Hugging Face Support (for grammar correction, translation, summarization)
-# Install separately with: pip install -r requirements-huggingface.txt
+# Install separately with: pip install -r requirements.txt
 # - transformers
 # - torch
 # - langchain-huggingface
@@ -161,7 +232,7 @@ orjson             # Fast JSON serialization
 ```
 
 ### Dependency Optimization
-> **💡 Optimization Tip**: For a **minimal installation**, you can use `requirements-minimal.txt` which excludes Hugging Face dependencies. The application will gracefully disable Hugging Face features when these dependencies are not available.
+> **💡 Optimization Tip**: The application includes all necessary dependencies in a single requirements.txt file. For a minimal installation, simply install only the dependencies you need.
 
 ### Development Dependencies
 ```bash
@@ -177,22 +248,17 @@ pre-commit         # Git hooks
 
 ### Installation Methods
 
-#### Method 1: Full Installation (with Hugging Face support)
+#### Method 1: Full Installation
 ```bash
-pip install -r requirements.txt -r requirements-huggingface.txt -r requirements-dev.txt
+pip install -r requirements.txt
 ```
 
-#### Method 2: Minimal Installation (without Hugging Face support)
-```bash
-pip install -r requirements-minimal.txt -r requirements-dev.txt
-```
-
-#### Method 3: Pipenv (Recommended)
+#### Method 2: Pipenv (Recommended)
 ```bash
 pipenv install --dev
 ```
 
-#### Method 4: Make Command (Auto-detection)
+#### Method 3: Make Command (Auto-detection)
 ```bash
 make install  # Detects pipenv/pip automatically
 ```
@@ -232,10 +298,8 @@ make install  # Detects pipenv/pip automatically
    # Or using pip with virtual environment
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
-   # For full features (including Hugging Face):
-   pip install -r requirements.txt -r requirements-huggingface.txt -r requirements-dev.txt
-   # For minimal installation (without Hugging Face):
-   pip install -r requirements-minimal.txt -r requirements-dev.txt
+   # Install all dependencies:
+   pip install -r requirements.txt
    ```
 
 3. **Set up frontend dependencies**:
@@ -375,17 +439,14 @@ make security
 # Run tests with pytest
 make test
 
-# Install pre-commit hooks
-make hooks
-
 # Run all quality gates
 make all
 
-# Clean cache and temporary files
-make clean
+# Install pre-commit hooks
+make hooks
 
-# Build and run with Docker (separate containers)
-make docker-simple
+# Run health check
+python scripts/health-check.py
 ```
 
 ### Project Management
@@ -405,8 +466,6 @@ make docker
 # Build and run with simplified Docker setup
 make docker-simple
 ```
-
-> **Note**: All commands automatically detect if you're using pipenv and run within the virtual environment.
 
 ## 📚 API Documentation Reference
 
@@ -713,7 +772,7 @@ All Python modules, classes, and functions in this project follow comprehensive 
 - **Purpose**: What the class represents or manages
 - **Key Methods**: Overview of primary public methods
 - **Usage Examples**: Basic usage patterns
-- **State Management**: How the class manages internal state
+- **CustomState Management**: How the class manages internal state
 
 #### Function Documentation
 - **Purpose**: Clear description of what the function does
@@ -725,7 +784,7 @@ All Python modules, classes, and functions in this project follow comprehensive 
 
 #### Example Documentation Structure
 
-```python
+```
 def stream_chat_tokens(
     user_id: str,
     thread_id: UUID | None,
@@ -858,7 +917,7 @@ The following modules have comprehensive documentation:
 - **ReDoc**: [http://localhost:8080/redoc](http://localhost:8080/redoc)
 
 #### Code Documentation
-```bash
+```
 # View module documentation
 python -c "import app.services; help(app.services)"
 
@@ -876,20 +935,21 @@ python -c "from app.services.impl.langgraph_service_impl import LangGraphService
 With the Spring MVC structure, imports are significantly cleaner:
 
 **Before (Old Structure):**
-```python
+
+```
 # Old complex import paths
 from app.services.interfaces.agent_service_interface import AgentServiceInterface
 from app.repositories.interfaces.thread_repository_interface import ThreadRepositoryInterface
-from app.agents.interfaces.llm_provider_interface import LLMFactoryInterface
+from app.ai_core.interfaces.llm_provider_interface import LLMFactoryInterface
 ```
 
 **After (Spring MVC Structure):**
 
-```python
+```
 # New clean import paths
 from app.services import AgentServiceInterface, UserServiceInterface
 from app.repositories import ThreadRepositoryInterface, DatabaseConnectionProvider
-from app.agents import LLMFactoryInterface
+from app.ai_core import LLMFactoryInterface
 ```
 
 **Package [__init__.py](file:///Users/abhishek/Desktop/Coding/AgenticAI/app/__init__.py) Files:**
@@ -924,6 +984,40 @@ Most modern IDEs will automatically display docstrings when hovering over functi
 - **VS Code**: Hover tooltips and Go to Definition
 - **PyCharm**: Quick Documentation (Ctrl+Q)
 - **Vim/Neovim**: LSP hover information
+
+
+
+### Code Quality Commands
+
+#### Documentation Standards
+
+```
+# Format code and fix import order
+make format
+
+# Lint with Ruff and auto-fix issues
+make lint
+
+# Type check with mypy
+make type
+
+# Security scan with Bandit
+make security
+
+# Run tests with pytest
+make test
+
+# Run all quality gates
+make all
+
+# Install pre-commit hooks
+make hooks
+
+# Run health check
+python scripts/health-check.py
+```
+
+
 
 
 
@@ -1160,7 +1254,6 @@ ModuleNotFoundError: No module named 'app'
 2. **Install dependencies**:
    ```bash
    pip install -r requirements.txt
-   pip install -r requirements-dev.txt
    ```
 
 3. **Run from correct directory**:
@@ -1256,7 +1349,7 @@ ModuleNotFoundError: No module named 'app'
 
 **Solutions**:
 1. **Update code**: Recent fixes added required ChatAnthropic parameters
-   ```python
+   ```bash
    # Fixed in latest version
    return ChatAnthropic(
        model_name=model_name,
@@ -1499,7 +1592,7 @@ lsof -p $(pgrep -f "python.*app.main")
    # New correct imports
    from app.services import AgentServiceInterface
    from app.repositories import ThreadRepositoryInterface
-   from app.agents import LLMFactoryInterface
+   from app.ai_core import LLMFactoryInterface
    
    # Avoid old import paths
    # from app.services.interfaces.agent_service_interface import AgentServiceInterface  # OLD
@@ -1560,7 +1653,7 @@ lsof -p $(pgrep -f "python.*app.main")
 **Solutions**:
 1. **Test LLM directly**:
    ```python
-   from app.agents.LLMFactory import LLMFactory
+   from app.ai_core.LLMFactory import LLMFactory
    llm = LLMFactory.create()
    response = llm.invoke("Hello")
    print(response.content)
@@ -1615,7 +1708,7 @@ python -c "from app.agents.impl.llm_factory_impl import LLMFactoryImpl; from app
 python -c "from app.core.di_container import inject; from app.services import AgentServiceInterface; inject(AgentServiceInterface); print('DI OK')"
 
 # New import structure verification
-python -c "from app.services import AgentServiceInterface; from app.repositories import ThreadRepositoryInterface; from app.agents import LLMFactoryInterface; print('Imports OK')"
+python -c "from app.services import AgentServiceInterface; from app.repositories import ThreadRepositoryInterface; from app.ai_core import LLMFactoryInterface; print('Imports OK')"
 
 # SecretStr functionality check
 python -c "from pydantic import SecretStr; print('SecretStr available:', SecretStr('test'))"
@@ -1758,31 +1851,6 @@ docker-compose up -d --build
 
 # Stop services
 docker-compose down
+
 ```
 
-### Docker Environment Variables
-
-The Docker setup uses environment variables from both the project root `.env` file (for backend) and `ui/.env` file (for frontend build-time configuration).
-
-**Backend Environment Variables (.env):**
-- API keys for LLM providers (GOOGLE_API_KEY, OPENAI_API_KEY, etc.)
-- Database configuration
-- Server settings (HOST, PORT, CORS_ORIGINS)
-
-**Frontend Environment Variables (ui/.env):**
-- VITE_API_BASE_URL: Backend server URL (default: http://localhost:8080)
-- VITE_API_PATH: API path prefix (default: /v1)
-- VITE_REQUEST_TIMEOUT_MS: Request timeout in milliseconds
-
-Both `.env` files are automatically loaded when running Docker containers. You can modify these files to configure your deployment.
-
-For persistent data, the container mounts the `app/db` directory to store SQLite database files.
-
-### Accessing the Application
-
-After starting the Docker containers:
-- **Frontend**: http://localhost:8000 (served by backend)
-- **Backend API**: http://localhost:8080
-- **API Docs**: http://localhost:8080/docs
-
-*Built with ❤️ for developers who value clean code and modern architecture.*

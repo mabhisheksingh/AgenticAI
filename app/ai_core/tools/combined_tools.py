@@ -1,0 +1,36 @@
+import logging
+
+from .duck_duck_go_tools import search_the_web
+from .math_tools import add, divide, multiply
+from .utility_tools import get_current_time
+
+logger = logging.getLogger(__name__)
+
+
+def get_combined_tools():
+    logger.info("Getting combined tools")
+    combined_tools = []
+
+    # combining math tools
+    combined_tools.extend(get_math_tools())
+
+    # combining utility tools
+    combined_tools.extend(get_utility_tools())
+
+    # Combining internet tools
+    combined_tools.extend(get_internet_tools())
+    logger.info("Tools combined successfully")
+    logger.debug("Combined tools: %s", combined_tools)
+    return combined_tools
+
+
+def get_math_tools():
+    return [multiply, add, divide]
+
+
+def get_utility_tools():
+    return [get_current_time]
+
+
+def get_internet_tools():
+    return [search_the_web, get_current_time]

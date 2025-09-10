@@ -5,26 +5,28 @@ including user retrieval, deletion, and thread operations.
 
 Uses dependency injection following DIP principles.
 """
+
 import logging
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Header, Query, Depends
+from fastapi import APIRouter, Depends, Header, Query
 
+from app.core.di_container import inject
 from app.core.response import ok
 from app.services import UserServiceInterface
-from app.core.di_container import inject
 
 user_router = APIRouter(prefix="/user", tags=["user"])
 
 
 def get_user_service() -> UserServiceInterface:
     """Dependency injection for UserService.
-    
+
     Returns:
         UserServiceInterface: Injected user service instance
     """
     return inject(UserServiceInterface)
+
 
 # Setup logging
 logging.basicConfig(
@@ -40,16 +42,16 @@ async def get_user(
 ) -> dict[str, Any]:
     """
     Retrieve all user IDs in the system.
-    
+
     Returns a list of all unique user IDs that have created threads.
     This endpoint is useful for user management and admin interfaces.
-    
+
     Returns:
         dict[str, Any]: Standard response envelope containing:
             - success: True
             - data: List of user ID strings
             - meta: None
-            
+
     Example Response:
         {
             "success": true,
@@ -68,13 +70,13 @@ async def delete_user_by_id(
 ) -> dict:
     """
     Delete a user and all associated threads.
-    
+
     This endpoint removes a user completely from the system, including
     all their conversation threads and related data.
-    
+
     Args:
         user_id (str): The unique identifier of the user to delete
-        
+
     Returns:
         dict: Standard response envelope containing:
             - success: True
@@ -82,7 +84,7 @@ async def delete_user_by_id(
                 - deleted: Boolean indicating if deletion occurred
                 - affected: Number of records deleted
             - meta: None
-            
+
     Example Response:
         {
             "success": true,
@@ -103,13 +105,13 @@ def list_threads_by_session(
 ) -> dict[str, Any]:
     """
     List all conversation threads for a specific user.
-    
+
     Retrieves all threads associated with the user identified by the user-id header.
     Each thread includes metadata such as creation time and thread label.
-    
+
     Headers:
         user-id (str): The unique identifier of the user whose threads to retrieve
-        
+
     Returns:
         dict[str, Any]: Standard response envelope containing:
             - success: True
@@ -119,7 +121,7 @@ def list_threads_by_session(
                 - created_at: Thread creation timestamp
                 - session_id: Associated user session
             - meta: None
-            
+
     Example Response:
         {
             "success": true,
@@ -167,17 +169,17 @@ def rename_thread_label(
 ) -> dict[str, Any]:
     """
     Update the label/name of a conversation thread.
-    
+
     Allows users to rename their conversation threads with custom labels
     for better organization and identification.
-    
+
     Query Parameters:
         threadId (UUID): The unique identifier of the thread to rename
         label (str): The new label/name for the thread
-        
+
     Headers:
         user-id (str): The unique identifier of the user who owns the thread
-        
+
     Returns:
         dict[str, Any]: Standard response envelope containing:
             - success: True
@@ -185,18 +187,18 @@ def rename_thread_label(
                 - renamed: Boolean indicating if rename was successful
                 - affected: Number of records updated (should be 1 if successful)
             - meta: None
-            
+
     Example Request:
         PATCH /v1/user/rename-thread-label?threadId=550e8400-e29b-41d4-a716-446655440000&label=My%20Chat
         Headers: user-id: user-123
-        
+
     Example Response:
         {
             "success": true,
             "data": {"renamed": true, "affected": 1},
             "meta": null
         }
-        
+
     Error Cases:
         - Thread not found: Returns success=true, renamed=false, affected=0
         - Thread belongs to different user: Returns success=true, renamed=false, affected=0

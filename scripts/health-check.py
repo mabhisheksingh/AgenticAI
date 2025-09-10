@@ -5,10 +5,11 @@ Health check script for AgenticAI application.
 This script verifies that all components are working correctly.
 """
 
-import os
-import sys
 import importlib.util
+import os
 from pathlib import Path
+import sys
+
 
 def check_python_version():
     """Check if Python 3.11+ is installed."""
