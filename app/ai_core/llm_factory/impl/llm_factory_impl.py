@@ -13,6 +13,7 @@ import os
 
 from dotenv import load_dotenv
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import BaseMessage, HumanMessage
 from pydantic import SecretStr
 
 from app.ai_core.llm_factory.llm_factory_interface import LLMFactoryInterface
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 
-def _get_temperature() -> float:
+def _get_temperature(llm_provider_type: LLMProvider | None = None) -> float:
     """Get the LLM temperature setting from environment variables.
 
     Returns:
@@ -35,9 +36,36 @@ def _get_temperature() -> float:
     """
     raw = os.getenv("LLM_TEMPERATURE", "0.7")
     try:
-        return float(raw)
+        temp = float(raw)
     except (TypeError, ValueError):
-        return 0.7
+        temp = 0.7
+    
+    # For specific provider types, use optimized temperatures
+    if llm_provider_type == LLMProvider.LLM_MEDIUM_MODEL:
+        return 0.3  # More deterministic for medium models
+    elif llm_provider_type == LLMProvider.LLM_SUMMARIZATION_MODEL:
+        return 0.2  # More deterministic for summarization
+    elif llm_provider_type == LLMProvider.LLM_SMALL_MODEL:
+        return 0.5  # Balanced for small models
+    
+    return temp
+
+
+def _get_timeout() -> int:
+    """Get the LLM timeout setting from environment variables.
+
+    Returns:
+        int: Timeout value for LLM requests in seconds
+             Defaults to 60 if not set or invalid
+
+    Environment Variables:
+        LLM_REQUEST_TIMEOUT: Timeout setting for LLM requests (default: "60")
+    """
+    raw = os.getenv("LLM_REQUEST_TIMEOUT", "60")
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return 60
 
 
 class LLMFactoryImpl(LLMFactoryInterface):
@@ -62,12 +90,8 @@ class LLMFactoryImpl(LLMFactoryInterface):
         if not model_name:
             raise ValueError(f"Environment variable {llm_provider_type.value} is not set")
 
-        # Use provided temperature or get default
-        temp = temperature if temperature is not None else _get_temperature()
-
-        # For medium models, use a lower default temperature for more concise responses
-        if llm_provider_type == LLMProvider.LLM_MEDIUM_MODEL and temperature is None:
-            temp = 0.3  # More deterministic for medium models
+        # Use provided temperature or get default based on provider type
+        temp = temperature if temperature is not None else _get_temperature(llm_provider_type)
 
         logger.info("Creating model=%s temperature=%s (streaming on)", model_name, temp)
         llm_instance = self.load_llm(model_name, temp, with_tools)
@@ -77,8 +101,8 @@ class LLMFactoryImpl(LLMFactoryInterface):
 
     def load_llm(self, model_name: str, temperature: float | None = None, with_tools: bool = True):
         logger.info("Loading LLM instance")
-        temp = temperature if temperature is not None else _get_temperature()
-        timeout = 60
+        temp = temperature if temperature is not None else _get_temperature(None)
+        timeout = _get_timeout()
         stop = None
         provider = self.get_provider(model_name)
         tools = get_combined_tools()
@@ -131,7 +155,7 @@ class LLMFactoryImpl(LLMFactoryInterface):
                     model_name=model_name,
                     api_key=SecretStr(api_key),
                     temperature=temp,
-                    timeout=60,
+                    timeout=timeout,
                     stop=None,
                 )
             elif provider == "groq":
@@ -156,7 +180,7 @@ class LLMFactoryImpl(LLMFactoryInterface):
                         "Ollama dependencies not found. Please ensure langchain-ollama is installed."
                     ) from e
 
-                llm = ChatOllama(model=model_name, stop=stop, temperature=temp)
+                llm = ChatOllama(model=model_name, stop=stop, temperature=temp, timeout=timeout)
             elif provider == "huggingface":
                 # Lazy load Hugging Face dependencies only when needed
                 try:
@@ -174,7 +198,7 @@ class LLMFactoryImpl(LLMFactoryInterface):
                 model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
 
                 # create HF pipeline
-                pipe = pipeline("text2text-generation", model=model, tokenizer=tokenizer)
+                pipe = pipeline("text2text-generation", model=model, tokenizer=tokenizer, timeout=timeout)
 
                 # Use HuggingFacePipeline instead of ChatHuggingFace
                 llm = HuggingFacePipeline(
@@ -184,12 +208,15 @@ class LLMFactoryImpl(LLMFactoryInterface):
                 raise ValueError(f"Unknown provider for model: {model_name}")
         except ValueError as e:
             raise ValueError(f"Error loading model: {e}")
-        return llm.bind_tools(tools) if with_tools else llm
+
+        # Bind tools uniformly; return a proper Runnable chat model
+        llm = llm.bind_tools(tools) if with_tools else llm
+
+        return llm
 
     @staticmethod
     def get_provider(model_name: str) -> str:
         return MODEL_PROVIDER_MAP.get(model_name, "unknown")
-
 
 # Map of models to their providers for LangChain
 MODEL_PROVIDER_MAP = {

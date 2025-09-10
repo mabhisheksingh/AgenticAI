@@ -36,6 +36,34 @@ from app.services import (
 logger = logging.getLogger(__name__)
 
 
+def _content_to_text(content) -> str:
+    """Normalize message content (str or content-part list) to plain text."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                if item.get("type") == "text":
+                    parts.append(str(item.get("text", "")))
+                else:
+                    parts.append(str(item))
+            else:
+                parts.append(str(item))
+        return " ".join([p for p in parts if p])
+    return str(content)
+
+
+def _is_blank_message(msg: BaseMessage) -> bool:
+    try:
+        text = _content_to_text(getattr(msg, "content", ""))
+        return not text or not text.strip()
+    except Exception:
+        return False
+
+
 class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
     """Service implementation for AI agent orchestration using StateGraphObject.
 
@@ -154,7 +182,7 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
         )
         thread_id = actual_thread_id
 
-        # Add the new user message
+        # Add the new user message as plain text content
         chat_messages.append(HumanMessage(content=message))
 
         # Summarize/prune messages if too long before streaming
@@ -163,11 +191,20 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
             chat_messages = summarize_messages(chat_messages, inject(LLMFactoryInterface))
             logger.info(f"[SUPERVISOR] Summarized chat history due to length > {MAX_MESSAGES}")
 
+        # Remove any blank messages to keep history clean
+        if chat_messages:
+            before = len(chat_messages)
+            chat_messages = [m for m in chat_messages if not _is_blank_message(m)]
+            after = len(chat_messages)
+            if after != before:
+                logger.info(f"Filtered {before - after} blank messages from history before streaming")
+
         # Initial metadata event
         yield f"data: {json.dumps({'threadId': str(thread_id), 'userId': user_id})}\n\n"
 
-        # User message acknowledgment
+        # User message acknowledgment with processing indicator
         yield f"data: {json.dumps({'type': 'user', 'content': 'Got it 👍 you want ' + message})}\n\n"
+        yield f"data: {json.dumps({'type': 'processing', 'content': 'Processing your request...'})}\n\n"
 
         try:
             if thread_id is None:
@@ -217,12 +254,27 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
                                         logger.info(
                                             f"[SUPERVISOR] Tool call detected: {tool_call['name']} with args: {tool_call.get('args', {})}"
                                         )
+                                        # Send tool call info to frontend
+                                        tool_name = tool_call['name']
+                                        yield f"data: {json.dumps({'type': 'tool_call', 'content': f'Executing {tool_name}...', 'metadata': {'node': node_name}})}\n\n"
                                 if hasattr(latest_message, "content"):
                                     content = latest_message.content
                                     # Handle different content types
                                     if isinstance(content, list):
-                                        # If content is a list, join it into a string
-                                        content = " ".join(str(item) for item in content)
+                                        # Extract human-readable text from content parts
+                                        parts: list[str] = []
+                                        for item in content:
+                                            if isinstance(item, str):
+                                                parts.append(item)
+                                            elif isinstance(item, dict):
+                                                if item.get("type") == "text":
+                                                    parts.append(str(item.get("text", "")))
+                                                else:
+                                                    # Fallback to string for non-text parts
+                                                    parts.append(str(item))
+                                            else:
+                                                parts.append(str(item))
+                                        content = " ".join([p for p in parts if p])
                                     elif not isinstance(content, str):
                                         # If content is not a string, convert it to string
                                         content = str(content)

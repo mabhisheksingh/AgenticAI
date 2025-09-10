@@ -65,12 +65,52 @@ const MessageBubble = ({ message, isLoading = false }) => {
 
   const isUser = message.role === 'user';
   const messageContent = message.text || message.content || '';
+  const isProcessing = message.isProcessing || false;
   
   // Don't render if there's no content and not loading
   if (!messageContent && !isLoading) {
     console.warn('MessageBubble: Message has no content:', message);
     return null;
   }
+
+  // Format content properly - handle objects with type/text structure
+  const formatContent = (content) => {
+    if (typeof content === 'string') {
+      return content;
+    }
+    
+    if (Array.isArray(content)) {
+      // Handle array of content parts
+      return content.map(part => {
+        if (typeof part === 'string') {
+          return part;
+        } else if (part && typeof part === 'object') {
+          if (part.type === 'text') {
+            return part.text || '';
+          }
+          // Handle other types of content parts
+          return JSON.stringify(part);
+        }
+        return String(part);
+      }).join('\n');
+    }
+    
+    if (content && typeof content === 'object') {
+      // Handle single object with type/text structure
+      if (content.type === 'text') {
+        return content.text || '';
+      }
+      // Handle other object structures
+      if (content.text) {
+        return content.text;
+      }
+      return JSON.stringify(content);
+    }
+    
+    return String(content);
+  };
+
+  const formattedContent = formatContent(messageContent);
 
   return (
     <Box display="flex" gap={1.5} mb={3}>
@@ -112,9 +152,18 @@ const MessageBubble = ({ message, isLoading = false }) => {
             }),
           }}
         >
-          <Typography variant="body1">
-            {messageContent}
-          </Typography>
+          {isProcessing ? (
+            <Box display="flex" alignItems="center" gap={1}>
+              <CircularProgress size={16} />
+              <Typography variant="body1" color="text.secondary">
+                {formattedContent || 'Processing your request...'}
+              </Typography>
+            </Box>
+          ) : (
+            <Typography variant="body1">
+              {formattedContent}
+            </Typography>
+          )}
         </Paper>
       </Box>
     </Box>

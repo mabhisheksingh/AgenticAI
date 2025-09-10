@@ -20,6 +20,25 @@ except ImportError as e:
     ROUTER_AVAILABLE = False
 
 
+def _ensure_content_format(content):
+    """Ensure content is properly formatted for Ollama models."""
+    if isinstance(content, str):
+        return [{"type": "text", "text": content}]
+    elif isinstance(content, list):
+        # Check if list contains properly formatted content parts
+        formatted_parts = []
+        for part in content:
+            if isinstance(part, str):
+                formatted_parts.append({"type": "text", "text": part})
+            elif isinstance(part, dict) and "type" in part:
+                formatted_parts.append(part)
+            else:
+                formatted_parts.append({"type": "text", "text": str(part)})
+        return formatted_parts
+    else:
+        return [{"type": "text", "text": str(content)}]
+
+
 def test_math_detection():
     """Test the math expression detection functionality."""
 
@@ -87,7 +106,7 @@ def test_routing():
         # Create a mock state
         state: CustomState = {
             "query": query,
-            "messages": [HumanMessage(content=query)],
+            "messages": [HumanMessage(content=_ensure_content_format(query))],
             "route": "general",
         }
 

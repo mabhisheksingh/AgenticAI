@@ -11,6 +11,7 @@ from app.core.enums import LLMProvider
 
 logger = logging.getLogger(__name__)
 
+
 # ---- General Agent ----
 _research_prompt = ChatPromptTemplate.from_messages(
     [
