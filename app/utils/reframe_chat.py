@@ -36,6 +36,25 @@ from app.core.errors import AppError
 logger = logging.getLogger(__name__)
 
 
+def _ensure_content_format(content):
+    """Ensure content is properly formatted for Ollama models."""
+    if isinstance(content, str):
+        return [{"type": "text", "text": content}]
+    elif isinstance(content, list):
+        # Check if list contains properly formatted content parts
+        formatted_parts = []
+        for part in content:
+            if isinstance(part, str):
+                formatted_parts.append({"type": "text", "text": part})
+            elif isinstance(part, dict) and "type" in part:
+                formatted_parts.append(part)
+            else:
+                formatted_parts.append({"type": "text", "text": str(part)})
+        return formatted_parts
+    else:
+        return [{"type": "text", "text": str(content)}]
+
+
 class ReframeChat:
     """Text correction service using tool-free LLM instances.
 
@@ -100,9 +119,9 @@ class ReframeChat:
             # Prepare messages for LLM
             messages = [
                 SystemMessage(
-                    content="Fix grammar and spelling errors. Return ONLY the corrected text, nothing else."
+                    content=_ensure_content_format("Fix grammar and spelling errors. Return ONLY the corrected text, nothing else.")
                 ),
-                HumanMessage(content=text),
+                HumanMessage(content=_ensure_content_format(text)),
             ]
 
             # Get correction from LLM

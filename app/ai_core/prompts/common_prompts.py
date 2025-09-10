@@ -68,7 +68,6 @@ CONVERSATION_SUMMARY_INSTRUCTIONS: str = (
     "Keep important facts and decisions, omit chit-chat."
 )
 
-
 def ensure_system_message(messages: list[BaseMessage], system_content: str) -> list[BaseMessage]:
     """Ensure the first message is a SystemMessage with the given content.
 

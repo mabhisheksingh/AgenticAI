@@ -7,6 +7,7 @@ import {
   InputAdornment,
   Typography,
   Chip,
+  CircularProgress,
 } from '@mui/material';
 import { Send, Label } from '@mui/icons-material';
 import { generateThreadLabel } from '../../utils/threadUtils';
@@ -96,7 +97,7 @@ const ChatInput = ({ onSendMessage, loading, disabled, isNewThread = false }) =>
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder={disabled ? "Please select a user first..." : "Ask something..."}
+            placeholder={disabled ? "Please select a user first..." : loading ? "Processing your request..." : "Ask something..."}
             disabled={loading || disabled}
             variant="outlined"
             size="medium"
@@ -106,21 +107,25 @@ const ChatInput = ({ onSendMessage, loading, disabled, isNewThread = false }) =>
               },
             }}
             InputProps={{
-              endAdornment: input.trim() && (
+              endAdornment: (
                 <InputAdornment position="end">
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    size="small"
-                    disabled={loading || disabled || !input.trim()}
-                    sx={{
-                      minWidth: 40,
-                      p: 1,
-                      borderRadius: 2,
-                    }}
-                  >
-                    <Send fontSize="small" />
-                  </Button>
+                  {loading ? (
+                    <CircularProgress size={24} />
+                  ) : (
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      size="small"
+                      disabled={loading || disabled || !input.trim()}
+                      sx={{
+                        minWidth: 40,
+                        p: 1,
+                        borderRadius: 2,
+                      }}
+                    >
+                      <Send fontSize="small" />
+                    </Button>
+                  )}
                 </InputAdornment>
               ),
             }}
@@ -136,7 +141,7 @@ const ChatInput = ({ onSendMessage, loading, disabled, isNewThread = false }) =>
                 borderRadius: 2,
               }}
             >
-              <Send />
+              {loading ? <CircularProgress size={24} /> : <Send />}
             </Button>
           )}
         </Box>

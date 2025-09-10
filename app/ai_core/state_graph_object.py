@@ -1,6 +1,7 @@
 import logging
 
 from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -25,6 +26,22 @@ def route_based_on_state(state: CustomState) -> str:
     return route
 
 
+# Fix for Ollama model content format issue - ensure messages are properly formatted
+def _ensure_message_content_format(state: CustomState) -> CustomState:
+    """Ensure all messages in the state have properly formatted content for Ollama."""
+    messages = state.get("messages", [])
+    for msg in messages:
+        if hasattr(msg, 'content') and isinstance(msg.content, str):
+            msg.content = [{"type": "text", "text": msg.content}]
+        elif hasattr(msg, 'content') and isinstance(msg.content, list):
+            # Check if any items in the list are strings that need to be converted
+            for i, item in enumerate(msg.content):
+                if isinstance(item, str):
+                    msg.content[i] = {"type": "text", "text": item}
+    state["messages"] = messages
+    return state
+
+
 # We are not using now inplace of router we are using supervisor_agent
 class StateGraphObject:
     def __init__(self, llm: BaseChatModel, db_provider: DatabaseConnectionProvider):
@@ -40,9 +57,66 @@ class StateGraphObject:
 
     def prepare_state_graph(self) -> Pregel:
         builder = StateGraph(CustomState)
-        builder.add_node("math", math_agent)
-        builder.add_node("code", code_agent)
-        builder.add_node("research", research_agent)
+
+        # ---- Sanitization wrappers to avoid empty messages in state ----
+        def _content_to_text(content) -> str:
+            if isinstance(content, str):
+                return content
+            if isinstance(content, list):
+                parts: list[str] = []
+                for item in content:
+                    if isinstance(item, str):
+                        parts.append(item)
+                    elif isinstance(item, dict) and item.get("type") == "text":
+                        parts.append(str(item.get("text", "")))
+                    else:
+                        parts.append(str(item))
+                return " ".join([p for p in parts if p])
+            return str(content)
+
+        def _sanitize_state_update(update: CustomState) -> CustomState:
+            try:
+                msgs = list(update.get("messages", []))
+            except Exception:
+                return update
+            sanitized = []
+            for m in msgs:
+                try:
+                    has_tools = hasattr(m, "tool_calls") and bool(getattr(m, "tool_calls", []))
+                    text = _content_to_text(getattr(m, "content", "")).strip()
+                    if text or has_tools:
+                        # Normalize list content to plain text for consistency downstream
+                        if not text and has_tools:
+                            # keep as-is to preserve tool call metadata
+                            sanitized.append(m)
+                        else:
+                            try:
+                                m.content = text
+                            except Exception:
+                                # If message is immutable, keep original
+                                pass
+                            sanitized.append(m)
+                except Exception:
+                    sanitized.append(m)
+            update["messages"] = sanitized
+            return update
+
+        def code_node(state: CustomState) -> CustomState:
+            out = code_agent.invoke(state)
+            return _sanitize_state_update(out)
+
+        def math_node(state: CustomState) -> CustomState:
+            out = math_agent.invoke(state)
+            return _sanitize_state_update(out)
+
+        def research_node(state: CustomState) -> CustomState:
+            out = research_agent.invoke(state)
+            return _sanitize_state_update(out)
+
+        # Register wrapped nodes
+        builder.add_node("math", math_node)
+        builder.add_node("code", code_node)
+        builder.add_node("research", research_node)
         builder.add_node("router", router)
         builder.add_node("tools", ToolNode(self.tools))  # Add tools node
         builder.add_node("nlp_formatting", nlp_formatting_agent)
@@ -60,7 +134,7 @@ class StateGraphObject:
         )
 
         # Add tool routing for the research agent
-        # The tools_condition function returns either "tools" or END
+        # After tools are used, route back to the originating agent to continue processing
         builder.add_conditional_edges(
             "research", tools_condition, {"tools": "tools", END: "router"}
         )

@@ -177,7 +177,7 @@ class UserServiceImpl(UserServiceInterface):
             messages = [
                 {
                     "role": "user" if msg.__class__.__name__ == "HumanMessage" else "assistant",
-                    "content": msg.content,
+                    "content": self._format_message_content(msg.content),
                 }
                 for msg in response_data.values["messages"]
                 if hasattr(msg, "content") and msg.content
@@ -190,3 +190,30 @@ class UserServiceImpl(UserServiceInterface):
             "created_at": db_response.get("created_at"),
             "thread_label": db_response.get("thread_label"),
         }
+    
+    def _format_message_content(self, content):
+        """Format message content to be compatible with frontend."""
+        if isinstance(content, str):
+            return content
+        elif isinstance(content, list):
+            # Handle list of content parts
+            texts = []
+            for part in content:
+                if isinstance(part, str):
+                    texts.append(part)
+                elif isinstance(part, dict):
+                    if part.get("type") == "text":
+                        texts.append(part.get("text", ""))
+                    else:
+                        texts.append(str(part))
+                else:
+                    texts.append(str(part))
+            return " ".join(texts)
+        elif isinstance(content, dict):
+            # Handle single content object
+            if content.get("type") == "text":
+                return content.get("text", "")
+            else:
+                return str(content)
+        else:
+            return str(content)

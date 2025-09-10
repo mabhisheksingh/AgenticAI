@@ -74,7 +74,7 @@ def create_app() -> FastAPI:
 
 app = create_app()
 host = os.getenv("HOST", "0.0.0.0")
-port = int(os.getenv("PORT", "8000"))
+port = int(os.getenv("PORT", "8080"))  # Changed default from "8000" to "8080" to match .env
 
 if __name__ == "__main__":
     import uvicorn

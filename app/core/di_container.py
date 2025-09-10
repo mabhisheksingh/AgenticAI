@@ -229,11 +229,17 @@ def configure_dependencies() -> DIContainer:
     from app.utils.mt5_service import MT5Service
     from app.utils.reframe_chat import ReframeChat, create_reframe_chat_service
 
+    # Create a singleton instance of LangGraphServiceImpl
+    langgraph_service_instance = None
+    
     def langgraph_service_factory():
-        llm_provider = container.resolve(LLMFactoryInterface)
-        thread_repository = container.resolve(ThreadRepositoryInterface)
-        db_provider = container.resolve(DatabaseConnectionProvider)
-        return LangGraphServiceImpl(llm_provider, thread_repository, db_provider)
+        nonlocal langgraph_service_instance
+        if langgraph_service_instance is None:
+            llm_provider = container.resolve(LLMFactoryInterface)
+            thread_repository = container.resolve(ThreadRepositoryInterface)
+            db_provider = container.resolve(DatabaseConnectionProvider)
+            langgraph_service_instance = LangGraphServiceImpl(llm_provider, thread_repository, db_provider)
+        return langgraph_service_instance
 
     def agent_service_factory():
         agent_executor = container.resolve(AgentExecutionInterface)

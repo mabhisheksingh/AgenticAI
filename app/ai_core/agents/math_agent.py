@@ -11,6 +11,7 @@ from app.core.enums import LLMProvider
 
 logger = logging.getLogger(__name__)
 
+
 _math_prompt = ChatPromptTemplate.from_messages(
     [
         ("system", MATH_SYSTEM_PROMPT),
