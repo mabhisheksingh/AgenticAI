@@ -64,16 +64,13 @@ class StateGraphObject:
         builder.add_conditional_edges(
             "research", tools_condition, {"tools": "tools", END: "router"}
         )
-        builder.add_edge("tools", "research")
-
-        # Add tool routing for the code agent
-        # The tools_condition function returns either "tools" or END
-        builder.add_conditional_edges("code", tools_condition, {"tools": "tools", END: "router"})
-        builder.add_edge("tools", "code")
-
-        # Add tool routing for the math agent
         # The tools_condition function returns either "tools" or END
         builder.add_conditional_edges("math", tools_condition, {"tools": "tools", END: "router"})
+        # The tools_condition function returns either "tools" or END
+        builder.add_conditional_edges("code", tools_condition, {"tools": "tools", END: "router"})
+
+        builder.add_edge("tools", "code")
+        builder.add_edge("tools", "research")
         builder.add_edge("tools", "math")
 
         # Final formatting is triggered explicitly by the router when plan completes
