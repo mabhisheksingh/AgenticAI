@@ -42,6 +42,7 @@ langchain-openai = "*"
 langchain-tavily = "*"
 langchain-experimental = "*"
 matplotlib = "*"
+langgraph-supervisor = "*"
 
 [dev-packages]
 black = "*"

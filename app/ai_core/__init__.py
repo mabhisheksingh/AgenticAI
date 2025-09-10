@@ -9,7 +9,7 @@ and implementations are in impl/ subfolder.
 """
 
 # Import and re-export interfaces
-from .llm_factory_interface import LLMFactoryInterface
+from app.ai_core.llm_factory.llm_factory_interface import LLMFactoryInterface
 
 __all__ = [
     "LLMFactoryInterface",

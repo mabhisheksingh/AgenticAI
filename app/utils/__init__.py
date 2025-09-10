@@ -5,10 +5,10 @@ the application.
 """
 
 # Import and re-export utility services
-from .reframe_chat import ReframeChat
 from .mt5_service import MT5Service
+from .reframe_chat import ReframeChat
 
 __all__ = [
-    "ReframeChat",
     "MT5Service",
+    "ReframeChat",
 ]

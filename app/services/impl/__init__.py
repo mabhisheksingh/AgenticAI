@@ -8,11 +8,11 @@ Follows Spring MVC conventions where implementations are in impl/ subfolder.
 
 # Re-export implementations for easier imports
 from .agent_service_impl import AgentServiceImpl
-from .user_service_impl import UserServiceImpl
 from .langgraph_service_impl import LangGraphServiceImpl
+from .user_service_impl import UserServiceImpl
 
 __all__ = [
     "AgentServiceImpl",
-    "UserServiceImpl", 
     "LangGraphServiceImpl",
+    "UserServiceImpl",
 ]

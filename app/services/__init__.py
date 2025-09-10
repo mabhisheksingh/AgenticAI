@@ -10,15 +10,15 @@ and implementations are in impl/ subfolder.
 
 # Import and re-export interfaces
 from .agent_service_interface import (
-    AgentServiceInterface,
     AgentExecutionInterface,
+    AgentServiceInterface,
     ConversationStateInterface,
 )
 from .user_service_interface import UserServiceInterface
 
 __all__ = [
-    "AgentServiceInterface",
     "AgentExecutionInterface",
-    "ConversationStateInterface", 
+    "AgentServiceInterface",
+    "ConversationStateInterface",
     "UserServiceInterface",
 ]

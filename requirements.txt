@@ -1,43 +1,42 @@
-langchain-tavily
-langchain-core
 # ==============================
-# Agentic AI Runtime Dependencies
+# Agentic AI Requirements (Runtime + Development)
 # ==============================
-# Note: Comments starting with '#' are ignored by pip.
-#       Keep only the providers/vector db you actually use to keep the env lean.
 
 # Agentic / LLM framework
 langgraph-checkpoint-sqlite
 langgraph
+langgraph-prebuilt
+langgraph-supervisor
 langchain
 langchain-community
+langchain-experimental
+langchain-tavily
+langchain-core
 langsmith
 langchain-openai
+langchain-anthropic
+langchain-google-genai
+langchain-groq
 langchain-ollama
-# Hugging Face integration (optional - install separately with requirements-huggingface.txt)
-# langchain-huggingface
+langchain-huggingface
 
-# Model providers (install only those you need)
+# Model providers
 openai
 anthropic
 google-generativeai
 groq
 litellm
 
-# Hugging Face models and tokenizers (optional - install separately with requirements-huggingface.txt)
-# transformers
-# torch
+# Hugging Face models and tokenizers
+transformers
+torch
+accelerate
+sentence-transformers
+tiktoken
 
-# Embeddings / tokenization (optional - install separately with requirements-huggingface.txt)
-# sentence-transformers
-# tiktoken
-
-# Vector db (pick 1–2)
+# Vector db
 chromadb
 qdrant-client
-# weaviate-client
-# faiss-cpu
-# pinecone-client
 
 # API / Web
 fastapi
@@ -48,13 +47,47 @@ sse-starlette
 python-multipart
 orjson
 
-# State / cache / queue (optional)
-redis
-# celery
-# rq
+# Database
+# SQLite (built-in with Python)
 
-# Observability / tracing (optional)
+# Cache
+redis
+
+# Observability / tracing
 opentelemetry-sdk
 
-# Config utils (optional)
+# Config utils
 python-dotenv
+
+# Search
+duckduckgo-search
+ddgs
+
+# Data visualization
+matplotlib
+
+# ==============================
+# Development Dependencies
+# ==============================
+
+# Formatting
+black
+isort
+
+# Linting
+ruff
+
+# Type checking
+mypy
+
+# Testing
+pytest
+pytest-asyncio
+pytest-cov
+httpx
+
+# Security
+bandit
+
+# Git hooks
+pre-commit

@@ -3,6 +3,7 @@
 This module provides high-level user services following ISP and DIP principles.
 The service is split into user management and thread management concerns.
 """
+
 from __future__ import annotations
 
 import logging
@@ -10,27 +11,26 @@ from typing import Any
 from uuid import UUID
 
 from app.core.errors import NotFoundError
-from app.services import UserServiceInterface
-from app.services import ConversationStateInterface
 from app.repositories import (
-    UserRepositoryInterface,
     ThreadRepositoryInterface,
+    UserRepositoryInterface,
 )
+from app.services import ConversationStateInterface, UserServiceInterface
 
 logger = logging.getLogger(__name__)
 
 
 class UserServiceImpl(UserServiceInterface):
     """Service implementation for user and thread management operations.
-    
+
     Implements UserServiceInterface following ISP (Interface Segregation Principle)
     and uses dependency injection following DIP (Dependency Inversion Principle).
-    
+
     This service provides business logic for user management, thread operations,
     and serves as an interface between the API routes and data repositories.
     It handles thread listing, deletion, renaming, and retrieval operations.
     """
-    
+
     def __init__(
         self,
         user_repository: UserRepositoryInterface,
@@ -38,7 +38,7 @@ class UserServiceImpl(UserServiceInterface):
         conversation_state: ConversationStateInterface,
     ):
         """Initialize the UserService with dependency injection.
-        
+
         Args:
             user_repository: Repository for user data operations
             thread_repository: Repository for thread data operations
@@ -50,10 +50,10 @@ class UserServiceImpl(UserServiceInterface):
 
     def get_all_users(self) -> list[str]:
         """Retrieve all unique user IDs from the system.
-        
+
         Returns:
             list[str]: List of all user IDs that have created threads
-            
+
         Example:
             >>> users = user_service.get_all_users()
             >>> print(users)  # ['user-123', 'user-456', 'admin']
@@ -62,13 +62,13 @@ class UserServiceImpl(UserServiceInterface):
 
     def delete_user(self, user_id: str) -> int:
         """Delete a user and all associated threads from the system.
-        
+
         Args:
             user_id (str): The unique identifier of the user to delete
-            
+
         Returns:
             int: Number of records affected by the deletion
-            
+
         Example:
             >>> affected = user_service.delete_user('user-123')
             >>> print(f"Deleted {affected} records")
@@ -77,17 +77,17 @@ class UserServiceImpl(UserServiceInterface):
 
     def list_threads_by_session(self, user_id: str) -> list[dict[str, Any]]:
         """List all threads belonging to a specific user.
-        
+
         Args:
             user_id (str): The unique identifier of the user
-            
+
         Returns:
             list[dict[str, Any]]: List of thread objects containing:
                 - thread_id: Unique thread identifier
                 - thread_label: Human-readable thread name
                 - created_at: Thread creation timestamp
                 - session_id: Associated user session ID
-                
+
         Example:
             >>> threads = user_service.list_threads_by_session('user-123')
             >>> for thread in threads:
@@ -97,14 +97,14 @@ class UserServiceImpl(UserServiceInterface):
 
     def delete_thread_by_session_and_id(self, user_id: str, thread_id: str) -> int:
         """Delete a specific thread belonging to a user.
-        
+
         Args:
             user_id (str): The unique identifier of the user
             thread_id (str): The unique identifier of the thread to delete
-            
+
         Returns:
             int: Number of records affected (0 if thread not found, 1 if deleted)
-            
+
         Example:
             >>> affected = user_service.delete_thread_by_session_and_id(
             ...     'user-123', 'thread-uuid-456'
@@ -116,15 +116,15 @@ class UserServiceImpl(UserServiceInterface):
 
     def rename_thread_label(self, user_id: str, thread_id: str, label: str) -> int:
         """Update the label/name of a specific thread.
-        
+
         Args:
             user_id (str): The unique identifier of the user
             thread_id (str): The unique identifier of the thread
             label (str): The new label/name for the thread
-            
+
         Returns:
             int: Number of records updated (0 or 1)
-            
+
         Example:
             >>> result = user_service.rename_thread_label(
             ...     'user-123', 'thread-uuid-456', 'My Important Chat'
@@ -136,14 +136,14 @@ class UserServiceImpl(UserServiceInterface):
 
     def get_thread_by_id(self, user_id: str, thread_id: UUID) -> dict[str, Any]:
         """Retrieve detailed information about a specific thread including messages.
-        
+
         This method combines database thread metadata with LangGraph conversation
         history to provide a complete thread view with all messages.
-        
+
         Args:
             user_id (str): The unique identifier of the user
             thread_id (UUID): The unique identifier of the thread
-            
+
         Returns:
             dict[str, Any]: Complete thread information containing:
                 - thread_id: Thread UUID as string
@@ -151,10 +151,10 @@ class UserServiceImpl(UserServiceInterface):
                 - messages: List of conversation messages with role and content
                 - created_at: Thread creation timestamp
                 - thread_label: Human-readable thread name
-                
+
         Raises:
             NotFoundError: If the thread doesn't exist or doesn't belong to the user
-            
+
         Example:
             >>> from uuid import UUID
             >>> thread_data = user_service.get_thread_by_id(
@@ -168,7 +168,7 @@ class UserServiceImpl(UserServiceInterface):
         db_response = self._thread_repository.get_by_session_and_thread(user_id, str(thread_id))
         if not db_response:
             raise NotFoundError("Thread not found")
-        
+
         response_data = self._conversation_state.get_conversation_state(thread_id, user_id)
 
         # Return thread details with messages

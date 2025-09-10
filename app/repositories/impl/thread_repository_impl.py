@@ -7,30 +7,33 @@ labeling, and deletion operations using SQLite as the persistence layer.
 Implements multiple segregated interfaces following ISP (Interface Segregation Principle)
 and uses dependency injection following DIP (Dependency Inversion Principle).
 """
+
 from __future__ import annotations
 
 from typing import Any
 import uuid
 
 from app.repositories import (
+    DatabaseConnectionProvider,
+    ThreadQueryInterface,
     ThreadRepositoryInterface,
     UserRepositoryInterface,
-    ThreadQueryInterface,
 )
-from app.repositories import DatabaseConnectionProvider
 
 
-class ThreadRepositoryImpl(ThreadRepositoryInterface, UserRepositoryInterface, ThreadQueryInterface):
+class ThreadRepositoryImpl(
+    ThreadRepositoryInterface, UserRepositoryInterface, ThreadQueryInterface
+):
     """Repository implementation for session-thread mapping and thread management operations.
-    
+
     Implements ISP by segregating interfaces:
     - ThreadRepositoryInterface: Thread-specific operations
-    - UserRepositoryInterface: User-specific operations  
+    - UserRepositoryInterface: User-specific operations
     - ThreadQueryInterface: Read-only thread queries
-    
+
     Uses DIP by depending on DatabaseConnectionProvider abstraction
     instead of concrete SQLite implementation.
-    
+
     Database Schema:
         session_threads table:
         - id: Primary key (UUID string)
@@ -38,38 +41,42 @@ class ThreadRepositoryImpl(ThreadRepositoryInterface, UserRepositoryInterface, T
         - thread_label: Optional display label for the thread
         - session_id: User/session identifier string
         - created_at: Timestamp when the thread was created
-        
+
     Unique Constraint:
         (session_id, thread_id) - prevents duplicate threads per session
-        
+
     Indexes:
         - idx_session_threads_session: On session_id for fast user queries
         - idx_session_threads_thread: On thread_id for fast thread lookups
     """
-    
+
     def __init__(self, db_provider: DatabaseConnectionProvider):
         """Initialize repository with database connection provider.
-        
+
         Args:
             db_provider: Database connection provider (implements DIP)
         """
         self._db_provider = db_provider
 
     def save(
-        self, session_id: str, thread_id: str, thread_label: str | None = None, id: str | None = None
+        self,
+        session_id: str,
+        thread_id: str,
+        thread_label: str | None = None,
+        id: str | None = None,
     ) -> dict[str, Any]:
         """Save or update a session-thread mapping.
-        
+
         Creates a new session-thread mapping or retrieves existing one if the
         (session_id, thread_id) combination already exists. Uses INSERT OR IGNORE
         to handle duplicate entries gracefully.
-        
+
         Args:
             session_id (str): User/session identifier
             thread_id (str): Conversation thread UUID
             thread_label (str, optional): Display label for the thread
             id (str, optional): Primary key UUID. Generated if not provided.
-            
+
         Returns:
             dict[str, Any]: Thread record containing:
                 - id: Primary key UUID
@@ -77,7 +84,7 @@ class ThreadRepositoryImpl(ThreadRepositoryInterface, UserRepositoryInterface, T
                 - thread_id: Thread UUID
                 - thread_label: Thread display label
                 - created_at: Creation timestamp (if retrieved from DB)
-                
+
         Example:
             >>> thread_repo.save("user123", "thread-uuid", "My Chat")
             {
@@ -125,13 +132,13 @@ class ThreadRepositoryImpl(ThreadRepositoryInterface, UserRepositoryInterface, T
 
     def get_all_users(self) -> list[str]:
         """Get all unique user/session IDs that have created threads.
-        
+
         Returns a sorted list of all session IDs that have at least one
         conversation thread. Useful for user management and admin interfaces.
-        
+
         Returns:
             list[str]: Sorted list of unique session IDs
-            
+
         Example:
             >>> thread_repo.get_all_users()
             ["admin", "user123", "user456"]
@@ -150,16 +157,16 @@ class ThreadRepositoryImpl(ThreadRepositoryInterface, UserRepositoryInterface, T
 
     def delete_user_by_id(self, user_id: str) -> int:
         """Delete all threads for a specific user/session.
-        
+
         Removes all thread records associated with the given session ID.
         This effectively deletes all conversation history for a user.
-        
+
         Args:
             user_id (str): Session ID of the user to delete
-            
+
         Returns:
             int: Number of thread records deleted
-            
+
         Example:
             >>> thread_repo.delete_user_by_id("user123")
             5  # Deleted 5 threads for user123
@@ -175,17 +182,17 @@ class ThreadRepositoryImpl(ThreadRepositoryInterface, UserRepositoryInterface, T
 
     def get_thread_by_id(self, thread_id: str) -> dict[str, Any] | None:
         """Retrieve a thread record by its thread ID.
-        
+
         Looks up a specific thread by its UUID, regardless of which
         session it belongs to.
-        
+
         Args:
             thread_id (str): Thread UUID to look up
-            
+
         Returns:
             dict[str, Any] | None: Thread record if found, None otherwise.
                 Contains id, session_id, thread_id, thread_label, created_at
-                
+
         Example:
             >>> thread_repo.get_thread_by_id("thread-uuid")
             {
@@ -212,17 +219,17 @@ class ThreadRepositoryImpl(ThreadRepositoryInterface, UserRepositoryInterface, T
 
     def get_session_by_id(self, session_id: str) -> list[dict[str, Any]]:
         """Get all threads for a specific session/user.
-        
+
         Retrieves all conversation threads associated with a given session ID,
         ordered by creation time (most recent first).
-        
+
         Args:
             session_id (str): Session ID to get threads for
-            
+
         Returns:
             list[dict[str, Any]]: List of thread records, ordered by created_at DESC.
                 Each record contains id, session_id, thread_id, thread_label, created_at
-                
+
         Example:
             >>> thread_repo.get_session_by_id("user123")
             [
@@ -258,18 +265,18 @@ class ThreadRepositoryImpl(ThreadRepositoryInterface, UserRepositoryInterface, T
 
     def get_by_session_and_thread(self, session_id: str, thread_id: str) -> dict[str, Any] | None:
         """Get a specific thread record by session and thread ID.
-        
+
         Retrieves the thread record that matches both the session ID and thread ID.
         This is the most specific lookup method.
-        
+
         Args:
             session_id (str): Session ID that owns the thread
             thread_id (str): Thread UUID to look up
-            
+
         Returns:
             dict[str, Any] | None: Thread record if found, None otherwise.
                 Contains id, session_id, thread_id, thread_label, created_at
-                
+
         Example:
             >>> thread_repo.get_by_session_and_thread("user123", "thread-uuid")
             {
@@ -296,22 +303,22 @@ class ThreadRepositoryImpl(ThreadRepositoryInterface, UserRepositoryInterface, T
 
     def delete_by_session_and_thread(self, session_id: str, thread_id: str) -> int:
         """Delete a specific thread mapping.
-        
+
         Removes the thread record that matches both session ID and thread ID.
         This deletes the mapping but doesn't affect the actual conversation
         data stored by LangGraph.
-        
+
         Args:
             session_id (str): Session ID that owns the thread
             thread_id (str): Thread UUID to delete
-            
+
         Returns:
             int: Number of rows deleted (0 or 1)
-            
+
         Example:
             >>> thread_repo.delete_by_session_and_thread("user123", "thread-uuid")
             1  # Successfully deleted
-            
+
             >>> thread_repo.delete_by_session_and_thread("user123", "nonexistent")
             0  # Nothing to delete
         """
@@ -326,25 +333,25 @@ class ThreadRepositoryImpl(ThreadRepositoryInterface, UserRepositoryInterface, T
 
     def rename_thread_label(self, session_id: str, thread_id: str, label: str) -> int:
         """Update the label for a specific thread.
-        
+
         Changes the display label for a thread identified by session ID and thread ID.
         The label is used in the UI to help users identify different conversations.
-        
+
         Args:
             session_id (str): Session ID that owns the thread
             thread_id (str): Thread UUID to update
             label (str): New label for the thread
-            
+
         Returns:
             int: Number of rows updated (0 or 1)
-            
+
         Example:
             >>> thread_repo.rename_thread_label("user123", "thread-uuid", "New Label")
             1  # Successfully updated
-            
+
             >>> thread_repo.rename_thread_label("user123", "nonexistent", "Label")
             0  # Nothing to update
-            
+
         Note:
             This method updates the thread_label field only. Other thread
             properties remain unchanged.

@@ -1,7 +1,7 @@
 """Agent implementations package.
 
 This package contains all agent implementations that implement
-the interfaces defined in the parent agents package.
+the interfaces defined in the parent ai_core package.
 
 Follows Spring MVC conventions where implementations are in impl/ subfolder.
 """

@@ -49,7 +49,7 @@ install:
 		pipenv install --dev; \
 	else \
 		echo "[install] pipenv not found, using pip..."; \
-		pip install -r requirements.txt -r requirements-dev.txt; \
+		pip install -r requirements.txt; \
 	fi
 
 run:

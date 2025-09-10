@@ -26,7 +26,7 @@ This guide provides comprehensive instructions for deploying the AgenticAI appli
    # Or using pip with virtual environment
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt -r requirements-dev.txt
+   pip install -r requirements.txt
    ```
 
 3. **Set up frontend dependencies**:
@@ -176,7 +176,7 @@ jobs:
         python-version: 3.11
     - name: Install dependencies
       run: |
-        pip install -r requirements.txt -r requirements-dev.txt
+        pip install -r requirements.txt
     - name: Run tests
       run: pytest
 
