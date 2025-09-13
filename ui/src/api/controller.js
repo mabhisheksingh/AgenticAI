@@ -2,6 +2,9 @@ import { http } from './http'
 import { Endpoints } from './endpoints'
 import { HEADER_THREAD_ID, HEADER_USER_ID } from './config'
 
+// Get timeout from environment variables, default to 60 seconds
+const REQUEST_TIMEOUT_MS = parseInt(import.meta.env.VITE_REQUEST_TIMEOUT_MS) || 60000;
+
 // Main controller: all API calls defined here
 export const api = {
   chat: async ({ user_id, thread_id, message }) => {
@@ -37,61 +40,102 @@ export const api = {
       requestBody.thread_id = thread_id
     }
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(requestBody),
-      signal,
-    })
+    // Add timeout controller using configurable timeout
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      timeoutController.abort();
+    }, REQUEST_TIMEOUT_MS); // Configurable timeout from .env
 
-    if (!res.ok || !res.body) {
-      const text = await res.text().catch(() => '')
-      const err = new Error(text || `Request failed with ${res.status}`)
-      err.status = res.status
-      // Log detailed error information for debugging
-      console.error('Chat API Error Details:', {
-        status: res.status,
-        statusText: res.statusText,
-        url: url,
-        headers: headers,
-        requestBody: requestBody,
-        responseText: text
-      })
-      throw err
+    // Combine signals if both are provided
+    let combinedSignal;
+    if (signal) {
+      combinedSignal = AbortSignal.any([signal, timeoutController.signal]);
+    } else {
+      combinedSignal = timeoutController.signal;
     }
 
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
+    // Track if onDone has been called to prevent multiple calls
+    let onDoneCalled = false;
+    const callOnDoneOnce = () => {
+      if (!onDoneCalled) {
+        onDoneCalled = true;
+        onDone?.();
+      }
+    };
 
     try {
-      while (true) {
-        const { value, done } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody),
+        signal: combinedSignal,
+      })
 
-        let idx
-        while ((idx = buffer.indexOf('\n')) !== -1) {
-          const line = buffer.slice(0, idx)
-          buffer = buffer.slice(idx + 1)
-          if (!line) continue
-          if (line.startsWith('data: ')) {
-            const payload = line.slice(6).trim()
-            if (payload === '[DONE]') {
-              onDone?.()
-              return
+      if (!res.ok || !res.body) {
+        const text = await res.text().catch(() => '')
+        const err = new Error(text || `Request failed with ${res.status}`)
+        err.status = res.status
+        // Log detailed error information for debugging
+        console.error('Chat API Error Details:', {
+          status: res.status,
+          statusText: res.statusText,
+          url: url,
+          headers: headers,
+          requestBody: requestBody,
+          responseText: text
+        })
+        throw err
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      try {
+        while (true) {
+          const { value, done } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+
+          let idx
+          while ((idx = buffer.indexOf('\n')) !== -1) {
+            const line = buffer.slice(0, idx)
+            buffer = buffer.slice(idx + 1)
+            if (!line) continue
+            if (line.startsWith('data: ')) {
+              const payload = line.slice(6).trim()
+              if (payload === '[DONE]') {
+                callOnDoneOnce();
+                return;
+              }
+              onEvent?.(payload)
             }
-            onEvent?.(payload)
           }
         }
+        // Call onDone when the stream completes normally
+        callOnDoneOnce();
+      } catch (e) {
+        if (e?.name === 'AbortError') {
+          // Check if it was a timeout
+          if (timeoutController.signal.aborted) {
+            onError?.(new Error(`Request timeout: No response received within ${REQUEST_TIMEOUT_MS/1000} seconds`))
+          } else {
+            return; // User cancelled
+          }
+        }
+        if (onError) onError(e)
+        else throw e
+      } finally {
+        clearTimeout(timeoutId);
+        try { reader.releaseLock() } catch {}
       }
-      onDone?.()
-    } catch (e) {
-      if (e?.name === 'AbortError') return
-      if (onError) onError(e)
-      else throw e
-    } finally {
-      try { reader.releaseLock() } catch {}
+    } catch (error) {
+      clearTimeout(timeoutId);
+      // Handle timeout specifically
+      if (timeoutController.signal.aborted) {
+        throw new Error(`Request timeout: No response received within ${REQUEST_TIMEOUT_MS/1000} seconds`);
+      }
+      throw error;
     }
   },
   listThreads: async ({ user_id }) => {
@@ -128,6 +172,12 @@ export const api = {
   // Get all users
   getAllUsers: async () => {
     const res = await http.get(Endpoints.getAllUsers)
+    return res.data
+  },
+  
+  // Delete a user
+  deleteUser: async ({ user_id }) => {
+    const res = await http.delete(Endpoints.deleteUser(user_id))
     return res.data
   },
 }

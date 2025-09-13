@@ -2,6 +2,20 @@
 
 A production-ready FastAPI backend with React frontend for agentic AI conversations. Features real-time streaming, multiple LLM providers, and modern architecture patterns.
 
+## Documentation
+
+This README is intentionally condensed. Refer to the docs directory for detailed guides:
+
+- Architecture: [docs/architecture.md](docs/architecture.md)
+- Backend: [docs/backend.md](docs/backend.md)
+- Agents & Routing: [docs/agents-routing.md](docs/agents-routing.md)
+- API Usage: [docs/api.md](docs/api.md)
+- UI (Frontend): [docs/ui.md](docs/ui.md)
+
+Quick links:
+- Full docs index: [docs/README.md](docs/README.md)
+- Root README (this file) provides a brief overview and quick start.
+
 ## 🚀 Key Features
 
 ### Backend
@@ -21,166 +35,25 @@ A production-ready FastAPI backend with React frontend for agentic AI conversati
 - **Multi-user Support** with persistent sessions
 - **Dark/Light Mode** with responsive design
 
-## 🧠 Multi-Agent Routing & Query Decomposition (Latest Architecture)
+## 🧠 Multi-Agent Routing & Query Decomposition
 
-### Overview
-AgenticAI features a **plan-and-dispatch multi-agent router** for robust multi-step, multi-domain query handling. Complex user queries are decomposed into atomic sub-queries using an LLM, and each sub-query is routed to the most appropriate specialized agent (math, code, research). This enables accurate, modular, and collaborative agent workflows.
+- Multi-agent query splitting, routing, and final answer formatting are described in the dedicated guide.
+- Includes state schema, router flow, and StateGraph nodes/edges.
 
-### How It Works
-1. **LLM-Based Query Decomposition**
-    - The router uses a dedicated LLM (configurable via provider) to split complex user queries into minimal, non-overlapping sub-questions.
-    - Example: "Who is the current PM of India and write a Java code for prime number?" →
-      - "Who is the current PM of India?" (→ research agent)
-      - "How do I write Java code to find prime numbers?" (→ code agent)
-      - "Show a Java function that checks if a number is prime." (→ code agent)
+See: [docs/agents-routing.md](docs/agents-routing.md)
 
-2. **Routing Plan Construction**
-    - The router builds a `routing_plan`: a list of (agent, subquery) pairs (only agents: math, code, research).
-    - The plan is tracked in the conversation state (`CustomState`) as `routing_plan`, `pending_routes`, and a `plan_active` flag.
+## 🏗️ Architecture (Overview)
 
-3. **Plan-and-Dispatch Orchestration**
-    - The router dispatches each sub-query in sequence:
-        - Pops the next (agent, subquery) from the plan.
-        - Appends the subquery as a new HumanMessage.
-        - Sets the route for the StateGraph to invoke the correct agent.
-    - After each agent responds, control returns to the router to dispatch the next subquery, until the plan is exhausted.
-    - If an agent invokes tools, the graph will route to the tools node and then back to the same agent, until the agent completes.
+- High-level layout of backend, frontend, AI Core, and repositories.
+- Project structure and component responsibilities.
 
-4. **Final Formatting**
-    - When all sub-queries are processed, the router routes to the `nlp_formatting` node.
-    - The formatting agent robustly handles agent outputs (including lists) and produces a clean, user-facing answer.
+See: [docs/architecture.md](docs/architecture.md)
 
-### State Fields Used
-- `route`: Current agent to invoke (math, code, research, nlp_formatting)
-- `routing_plan`: List of (agent, subquery) pairs
-- `pending_routes`: List of remaining agent types to invoke
-- `plan_active`: True if a plan is being executed
-- `messages`: Conversation history (with reducers for streaming)
-- `summary`: Conversation summary (with safe reducer)
+## UI (Frontend)
 
-### StateGraph Flow Example
-```
-User Query → router
-  ├─> router splits query with LLM → builds routing_plan
-  ├─> router dispatches subquery #1 → research
-  │     └─> research result → router
-  ├─> router dispatches subquery #2 → code
-  │     └─> code result → router
-  ├─> router dispatches subquery #3 → code
-  │     └─> code result → router
-  └─> routing_plan exhausted → router sets route to nlp_formatting
-        └─> nlp_formatting produces final answer
-```
+- Frontend stack, directory layout, and dev commands.
 
-### Implementation Notes
-- **No Simulation AIMessage:** The router does not emit concatenated simulation strings. Each subquery is dispatched as a true message for agent execution.
-- **Agents route back to router:** After each agent completes (unless tools are invoked), the StateGraph returns to the router for the next dispatch.
-- **Formatting agent is robust:** Handles AIMessage.content as string, list, or dict.
-- **No direct agent → nlp_formatting edges:** Final formatting only occurs after all plan steps are complete.
-- **No supervisor agent:** All orchestration is handled by the router and StateGraph.
-- **No Spring MVC:** Backend is FastAPI-based.
-- **No "web" agent node:** While `should_route_to_web` exists, there is no explicit web agent node in the StateGraph.
-
-### Example State (Partial)
-```python
-{
-    'route': 'code',
-    'routing_plan': [('code', 'How do I write Java code to find prime numbers?'), ...],
-    'plan_active': True,
-    'messages': [HumanMessage(...), AIMessage(...), ...],
-    ...
-}
-```
-
-## 🏗️ Architecture
-
-### System Overview
-```
-Frontend (React) ↔️ HTTP/SSE ↔️ FastAPI Backend ↔️ LLM Providers
-                                          │
-                                     SQLite DB
-```
-
-### Key Components
-- **Services**: Business logic with dependency injection
-- **Repositories**: Data access layer (SQLite)
-- **Agents**: LLM provider abstractions (factory pattern)
-- **Routers**: REST API endpoints (`/v1/user/*`, `/v1/agent/*`)
-- **Specialized AI Services**: MT5Service for grammar correction and translation
-
-### Project Structure
-```
-app/
-├── agents/          # LLM provider factory
-├── core/            # DI container, errors, middleware
-├── repositories/    # Data access layer
-├── routers/         # API endpoints
-├── services/        # Business logic
-├── schemas/         # Pydantic models
-└── main.py          # FastAPI app
-
-ui/
-├── components/      # React components
-├── hooks/           # Custom hooks (useChat, useThreads)
-├── api/             # API integration
-└── utils/           # Utility functions
-```
-
-```
-# Direct resolution when needed
-reframer = inject(ReframeChat)
-corrected_text = reframer.correct("bad grammer text")
-```
-
-#### Benefits of DI Implementation
-- **Testability**: Easy to mock dependencies in unit tests
-- **Flexibility**: Swap implementations without changing client code
-- **Separation of Concerns**: Clear boundaries between components
-- **Configuration**: Centralized dependency configuration
-- **Maintainability**: Loose coupling makes refactoring easier
-
-### Frontend Structure
-```
-ui/src/
-  ├── components/               # React components
-  │   ├── chat/                 # Chat-related components
-  │   │   ├── ChatArea.jsx      # Main chat display area
-  │   │   ├── ChatInput.jsx     # Message input with streaming
-  │   │   ├── MessageBubble.jsx # Individual message display
-  │   │   └── index.js          # Component exports
-  │   ├── sidebar/              # Sidebar navigation
-  │   │   ├── Sidebar.jsx       # Main sidebar container
-  │   │   ├── ThreadItem.jsx    # Individual thread item
-  │   │   ├── ThreadList.jsx    # Thread list with management
-  │   │   └── index.js          # Component exports
-  │   ├── layout/               # Layout components
-  │   │   ├── TopBar.jsx        # Top navigation bar
-  │   │   ├── Footer.jsx        # Footer component
-  │   │   └── index.js          # Component exports
-  │   └── ui/                   # Reusable UI components
-  │       ├── UserSelector.jsx  # User dropdown with search
-  │       ├── ThemeToggle.jsx   # Dark/light mode toggle
-  │       ├── ErrorBoundary.jsx # Error boundary wrapper
-  │       └── index.js          # Component exports
-  ├── hooks/                    # Custom React hooks
-  │   ├── useChat.js            # Chat state management
-  │   ├── useThreads.js         # Thread management
-  │   └── index.js              # Hook exports
-  ├── api/                      # API integration
-  │   ├── config.js             # API configuration
-  │   ├── controller.js         # API methods
-  │   ├── endpoints.js          # Endpoint definitions
-  │   └── http.js               # HTTP client
-  ├── utils/                    # Utility functions
-  │   ├── threadUtils.js        # Thread-related utilities
-  │   └── index.js              # Utility exports
-  ├── contexts/                 # React contexts
-  │   └── ThemeContext.jsx      # Theme state management
-  ├── theme/                    # Theme configuration
-  │   └── theme.js              # Material-UI theme
-  ├── App.jsx                   # Main application component
-  └── main.jsx                  # Application entry point
-```
+See: [docs/ui.md](docs/ui.md)
 
 ## 📦 Dependencies & Installation
 
@@ -333,7 +206,7 @@ make install  # Detects pipenv/pip automatically
    python -m app.main
    ```
    
-   **Option 3: Run frontend only (connects to backend on localhost:8000)**
+   **Option 3: Run frontend only (connects to backend on localhost:8080)**
    ```bash
    cd ui
    npm run dev
@@ -341,8 +214,8 @@ make install  # Detects pipenv/pip automatically
 
 6. **Access the application**:
    - **Frontend**: http://localhost:5173
-   - **Backend API**: http://localhost:8000
-   - **API Docs**: http://localhost:8000/docs
+   - **Backend API**: http://localhost:8080
+   - **API Docs**: http://localhost:8080/docs
 
 ### 2. Environment Configuration
 
@@ -351,7 +224,7 @@ Create `.env` file:
 ``env
 # Server
 HOST=0.0.0.0
-PORT=8000
+PORT=8080
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 
 # === LLM Provider Selection ===
@@ -410,13 +283,13 @@ docker-compose -f docker-compose.simple.yml up --build
 
 # Build and run with single container (backend + frontend)
 docker build -t agenticai .
-docker run -p 8000:8000 --env-file .env agenticai
+docker run -p 8080:8080 --env-file .env agenticai
 ```
 
 ### 4. Access Application
 
-- **Frontend**: http://localhost:5173 (development) or http://localhost:8000 (Docker)
-- **API Docs**: http://localhost:8000/docs
+- **Frontend**: http://localhost:5173 (development) or http://localhost:8080 (Docker)
+- **API Docs**: http://localhost:8080/docs
 
 
 
@@ -666,6 +539,40 @@ Rename thread label.
 
 ## 🔧 Development
 
+## Migration Notes (Recent Refactor)
+
+The codebase was refactored to simplify agent orchestration and dependency wiring.
+
+- __AI Core consolidation__: Agents, tools, router, and state graph now live under `app/ai_core/`.
+- __Agent configuration__: Agents are defined via `AgentConfig` in `app/utils/agent_utils.py` with fields for `model`, `model_provider`, `tools`, `temperature`, and `prompt`.
+- __Router and graph__: Query decomposition and routing are handled in `app/ai_core/agents/new_router.py` and `app/ai_core/agents/router.py`, orchestrated by `app/ai_core/state_graph_object.py`.
+- __DI bindings__: `AgentExecutionInterface` and `ConversationStateInterface` are both bound to a singleton `LangGraphServiceImpl` instance in `app/core/di_container.py`.
+- __Logging__: Common logging format centralized in `app/utils/loging_utils.py`.
+- __Ports__: Default backend port is `8080` (see `PORT` in `.env`, default in `app/main.py`).
+
+If you had code referencing an LLM factory abstraction, migrate to using the concrete agent configs (`agent_utils.py`) and `init_chat_model(...)` where needed, as shown in the README example.
+
+## API Usage (curl)
+
+Test the agent chat endpoint with SSE streaming:
+
+```bash
+# Create/continue a chat (SSE streaming)
+curl -N \
+  -X POST http://localhost:8080/v1/agent/chat \
+  -H 'Content-Type: application/json' \
+  -H 'user-id: test-user-123' \
+  -d '{
+    "message": "Who is the PM of India and what is 3*99.8?",
+    "thread_label": "default"
+  }'
+```
+
+Notes:
+- __Headers__: `user-id` is required (FastAPI header for `user_id`).
+- __Body__: `message` (string), `thread_label` (string, required), `thread_id` (UUID string, optional).
+- __SSE__: The endpoint streams Server-Sent Events; `-N` keeps the connection open so you see partial tokens in real time.
+
 ### Code Quality Commands
 
 #### Documentation Standards
@@ -832,56 +739,10 @@ The following modules have comprehensive documentation:
 - **`SqlLiteConfig.py`**: Database connection management and schema migration
 
 #### Utilities (`app/utils/`)
-- **`text.py`**: Content extraction and text processing utilities
-- **`reframe_chat.py`**: **AI-powered text correction service with dependency injection support**
-  - **Text Correction**: Grammar, spelling, and clarity improvements using LLM
-  - **Dependency Injection**: Follows DIP principles with automatic LLM provider injection
-  - **Minimal & Clean**: Simplified implementation focusing on core functionality
-  - **Tool-Free LLM**: Uses LLM instances without tools to prevent interference
-  - **Error Handling**: Comprehensive error handling with custom exceptions
-  - **Usage Example**:
-    ```python
-    from app.core.di_container import inject
-    from app.utils.reframe_chat import ReframeChat
-    
-    # Using dependency injection (recommended)
-    reframer = inject(ReframeChat)
-    
-    # Basic text correction
-    corrected = reframer.correct("i need halp with my cod")
-    # Returns: "I need help with my code"
-    
-    # Fix grammar and spelling
-    fixed = reframer.correct("this funktoin dosnt work proprly")
-    # Returns: "This function doesn't work properly"
-    ```
-- **`mt5_service.py`**: **Specialized grammar correction and translation service**
-  - **Grammar Correction**: Uses vennify/t5-base-grammar-correction model for accurate grammar fixes
-  - **Translation**: Supports multilingual translation with mT5 models
-  - **Text Summarization**: Provides text summarization capabilities
-  - **Model Flexibility**: Configurable LLM models via environment variables
-  - **Fallback Handling**: Graceful degradation when correction models don't improve text
-  - **Dependency Injection**: Seamlessly integrated with the DI container
-  - **Tool-Free LLM**: Uses LLM instances without tools for optimal text processing
-  - **Usage Example**:
-    ```python
-    from app.core.di_container import inject
-    from app.utils.mt5_service import MT5Service
-    
-    # Using dependency injection
-    grammar_service = inject(MT5Service)
-    
-    # Grammar correction
-    corrected = grammar_service.correct_grammar("this sentence have grammer errors")
-    # Returns: "this sentence has grammar errors."
-    
-    # Translation
-    translated = grammar_service.translate("Hello world", "Spanish")
-    # Returns: "Hola mundo"
-    
-    # Summarization
-    summary = grammar_service.summarize("Long text to summarize...", max_length=100)
-    ```
+- **`prompt_utils.py`**: System prompts and helper prompt builders (router classification, final synthesis, etc.)
+- **`agent_utils.py`**: `AgentConfig` dataclass and concrete agent definitions (model, tools, prompts)
+- **`loging_utils.py`**: Central logging format for consistent logs across modules
+- **`llm_utils.py`**: Temperature helper, provider map, and query normalization
 
 #### Service Layer (`app/services/`)
 - **`agent_service_interface.py`**: Agent service contracts (AgentServiceInterface, AgentExecutionInterface, ConversationStateInterface)
@@ -890,17 +751,57 @@ The following modules have comprehensive documentation:
 - **`impl/langgraph_service_impl.py`**: LangGraph workflow orchestration
 - **`impl/user_service_impl.py`**: User management business logic
 
+##### DI Wiring Summary
+The DI container binds execution and state interfaces to a single `LangGraphServiceImpl` singleton:
+
+```python
+# app/core/di_container.py (summary)
+from app.services import AgentExecutionInterface, ConversationStateInterface
+from app.services.impl.langgraph_service_impl import LangGraphServiceImpl
+
+def langgraph_service_factory():
+    # resolves ThreadRepositoryInterface and DatabaseConnectionProvider
+    return LangGraphServiceImpl(thread_repository, db_provider)
+
+container.register_factory(AgentExecutionInterface, langgraph_service_factory)
+container.register_factory(ConversationStateInterface, langgraph_service_factory)
+```
+
 #### Repository Layer (`app/repositories/`)
 - **`thread_repository_interface.py`**: Thread and session data access contracts
 - **`database_interface.py`**: Database connection provider contracts
 - **`impl/thread_repository_impl.py`**: Thread and session data access implementation
 
-#### Agents Layer (`app/agents/`)
-- **`llm_provider_interface.py`**: LLM provider abstraction contracts
-- **`impl/llm_factory_impl.py`**: Factory implementation for multiple LLM providers with tool management
-  - **Tool Management**: Enhanced with `with_tools` parameter to create LLM instances with or without tools
-  - **Hugging Face Support**: Added support for Hugging Face models like grammar correction and translation models
-  - **Multiple Provider Support**: Ollama, Google Gemini, OpenAI, Anthropic, Groq, Hugging Face
+#### AI Core Layer (`app/ai_core/`)
+- **`agents/`**: Specialized agents and router
+  - `code_agent.py`, `math_agent.py`, `research_agent.py`
+  - `new_router.py` and `router.py` (query decomposition and routing)
+- **`state_graph_object.py`**: LangGraph graph assembly and execution
+- **`tools/`**: Combined and domain tools for agents
+- Utilities used by agents:
+  - `app/utils/agent_utils.py`: `AgentConfig` dataclass and agent definitions (model, tools, prompt)
+  - `app/utils/prompt_utils.py`: System prompts and helper prompt builders
+  - `app/utils/loging_utils.py`: Standard logging format
+
+Example agent usage:
+
+```python
+from langchain.chat_models import init_chat_model
+from langgraph.prebuilt import create_react_agent
+from app.utils.agent_utils import CODE_AGENT
+
+_llm = init_chat_model(
+    model=CODE_AGENT.model,
+    model_provider=CODE_AGENT.model_provider,
+    temperature=CODE_AGENT.temperature,
+)
+code_agent = create_react_agent(
+    model=_llm,
+    tools=CODE_AGENT.tools,
+    prompt=CODE_AGENT.prompt,
+    name=CODE_AGENT.name,
+)
+```
 
 #### API Layer (`app/routers/`)
 - **`AgenticRouter.py`**: AI agent and chat endpoints
@@ -932,7 +833,7 @@ python -c "from app.services.impl.langgraph_service_impl import LangGraphService
 
 #### New Simplified Import Pattern (Post Spring MVC Reorganization)
 
-With the Spring MVC structure, imports are significantly cleaner:
+With the Spring MVC style structure and the refactor to `app/ai_core/`, imports are cleaner and centralized:
 
 **Before (Old Structure):**
 
@@ -940,7 +841,6 @@ With the Spring MVC structure, imports are significantly cleaner:
 # Old complex import paths
 from app.services.interfaces.agent_service_interface import AgentServiceInterface
 from app.repositories.interfaces.thread_repository_interface import ThreadRepositoryInterface
-from app.ai_core.interfaces.llm_provider_interface import LLMFactoryInterface
 ```
 
 **After (Spring MVC Structure):**
@@ -949,11 +849,12 @@ from app.ai_core.interfaces.llm_provider_interface import LLMFactoryInterface
 # New clean import paths
 from app.services import AgentServiceInterface, UserServiceInterface
 from app.repositories import ThreadRepositoryInterface, DatabaseConnectionProvider
-from app.ai_core import LLMFactoryInterface
+# AI Core is consumed via StateGraph and agent modules; no direct factory import needed
+from app.ai_core.state_graph_object import StateGraphObject
 ```
 
 **Package [__init__.py](file:///Users/abhishek/Desktop/Coding/AgenticAI/app/__init__.py) Files:**
-Each main package re-exports its interfaces for clean imports:
+Each main package re-exports its interfaces for clean imports (e.g., services, repositories):
 
 ```python
 # app/services/__init__.py
@@ -966,7 +867,7 @@ from .user_service_interface import UserServiceInterface
 
 __all__ = [
     "AgentServiceInterface",
-    "AgentExecutionInterface", 
+    "AgentExecutionInterface",
     "ConversationStateInterface",
     "UserServiceInterface",
 ]
@@ -1170,7 +1071,7 @@ ls -la app/db/
 ```bash
 # Direct deployment
 pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
 
 #### Frontend
@@ -1352,7 +1253,7 @@ ModuleNotFoundError: No module named 'app'
    ```bash
    # Fixed in latest version
    return ChatAnthropic(
-       model_name=model_name,
+       model_type=model_type,
        api_key=SecretStr(api_key),
        temperature=temp,
        timeout=60,
@@ -1592,7 +1493,7 @@ lsof -p $(pgrep -f "python.*app.main")
    # New correct imports
    from app.services import AgentServiceInterface
    from app.repositories import ThreadRepositoryInterface
-   from app.ai_core import LLMFactoryInterface
+   from app.ai_core.state_graph_object import StateGraphObject
    
    # Avoid old import paths
    # from app.services.interfaces.agent_service_interface import AgentServiceInterface  # OLD
@@ -1653,10 +1554,25 @@ lsof -p $(pgrep -f "python.*app.main")
 **Solutions**:
 1. **Test LLM directly**:
    ```python
-   from app.ai_core.LLMFactory import LLMFactory
-   llm = LLMFactory.create()
-   response = llm.invoke("Hello")
-   print(response.content)
+   import os
+   from dotenv import load_dotenv
+   from langchain.chat_models import init_chat_model
+   from app.core.enums import LLMProvider
+   from app.utils.llm_utils import MODEL_PROVIDER_MAP
+
+   load_dotenv()
+
+   model_env = LLMProvider.LLM_MEDIUM_MODEL  # e.g., "LLM_MEDIUM_MODEL"
+   model_name = os.getenv(model_env)
+   assert model_name, f"{model_env} is not set"
+
+   llm = init_chat_model(
+       model=model_name,
+       model_provider=MODEL_PROVIDER_MAP.get(model_name),
+       temperature=0.2,
+   )
+   resp = llm.invoke("Hello")
+   print(getattr(resp, "content", resp))
    ```
 
 2. **Check model availability**:
@@ -1702,13 +1618,13 @@ curl http://localhost:8080/docs
 python -c "from app.config.SqlLiteConfig import get_sql_lite_instance; print('DB OK')"
 
 # LLM connectivity (updated for SecretStr compatibility)
-python -c "from app.agents.impl.llm_factory_impl import LLMFactoryImpl; from app.core.enums import LLMProvider; LLMFactoryImpl().create_model(LLMProvider.ollama); print('LLM OK')"
+python -c "import os; from app.utils.llm_utils import MODEL_PROVIDER_MAP; m=os.getenv('LLM_MEDIUM_MODEL'); print('LLM_MEDIUM_MODEL:', m); print('Provider:', MODEL_PROVIDER_MAP.get(m))"
 
 # Dependency injection health
 python -c "from app.core.di_container import inject; from app.services import AgentServiceInterface; inject(AgentServiceInterface); print('DI OK')"
 
 # New import structure verification
-python -c "from app.services import AgentServiceInterface; from app.repositories import ThreadRepositoryInterface; from app.ai_core import LLMFactoryInterface; print('Imports OK')"
+python -c "from app.services import AgentServiceInterface; from app.repositories import ThreadRepositoryInterface; from app.ai_core.state_graph_object import StateGraphObject; print('Imports OK')"
 
 # SecretStr functionality check
 python -c "from pydantic import SecretStr; print('SecretStr available:', SecretStr('test'))"
@@ -1838,7 +1754,7 @@ This project includes Docker support for flexible deployment options.
 docker build -t agenticai .
 
 # Run the container with external .env file
-docker run -p 8000:8000 --env-file .env -v $(pwd)/app/db:/app/app/db agenticai
+docker run -p 8080:8080 --env-file .env -v $(pwd)/app/db:/app/app/db agenticai
 ```
 
 #### Option 2: Separate Containers with Docker Compose

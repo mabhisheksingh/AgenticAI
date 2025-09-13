@@ -11,8 +11,6 @@ from collections.abc import Callable
 import logging
 from typing import Any, TypeVar, cast
 
-from app.ai_core.llm_factory.llm_factory_interface import LLMFactoryInterface
-
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -215,30 +213,25 @@ def configure_dependencies() -> DIContainer:
     container.register_factory(UserRepositoryInterface, thread_repository_factory)  # Same instance
     container.register_factory(ThreadQueryInterface, thread_repository_factory)  # Same instance
 
-    # LLM Factory
-    from app.ai_core.llm_factory.impl import LLMFactoryImpl
-
-    container.register_transient(LLMFactoryInterface, LLMFactoryImpl)
-
     # Services
     from app.services.impl import (
         AgentServiceImpl,
-        LangGraphServiceImpl,
         UserServiceImpl,
     )
-    from app.utils.mt5_service import MT5Service
-    from app.utils.reframe_chat import ReframeChat, create_reframe_chat_service
+    from app.services.impl.langgraph_service_impl import LangGraphServiceImpl
 
     # Create a singleton instance of LangGraphServiceImpl
     langgraph_service_instance = None
-    
+
+
     def langgraph_service_factory():
         nonlocal langgraph_service_instance
         if langgraph_service_instance is None:
-            llm_provider = container.resolve(LLMFactoryInterface)
             thread_repository = container.resolve(ThreadRepositoryInterface)
             db_provider = container.resolve(DatabaseConnectionProvider)
-            langgraph_service_instance = LangGraphServiceImpl(llm_provider, thread_repository, db_provider)
+            langgraph_service_instance = LangGraphServiceImpl(
+                thread_repository, db_provider
+            )
         return langgraph_service_instance
 
     def agent_service_factory():
@@ -251,23 +244,13 @@ def configure_dependencies() -> DIContainer:
         conversation_state = container.resolve(ConversationStateInterface)
         return UserServiceImpl(user_repository, thread_repository, conversation_state)
 
+
+    # Wire interfaces to the LangGraph service singleton
     container.register_factory(AgentExecutionInterface, langgraph_service_factory)
     container.register_factory(ConversationStateInterface, langgraph_service_factory)
+
     container.register_factory(AgentServiceInterface, agent_service_factory)
     container.register_factory(UserServiceInterface, user_service_factory)
-
-    # Utility services
-    container.register_factory(ReframeChat, create_reframe_chat_service)
-
-    # Pre-create MT5Service to avoid circular dependency
-    def mt5_service_factory():
-        # Create a new instance of LLMFactoryImpl directly to avoid DI resolution
-        from app.ai_core.llm_factory.impl import LLMFactoryImpl
-
-        llm_factory = LLMFactoryImpl()
-        return MT5Service(llm_factory)
-
-    container.register_factory(MT5Service, mt5_service_factory)
 
     logger.info("Dependencies configured")
     return container

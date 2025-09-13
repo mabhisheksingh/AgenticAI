@@ -190,7 +190,7 @@ class UserServiceImpl(UserServiceInterface):
             "created_at": db_response.get("created_at"),
             "thread_label": db_response.get("thread_label"),
         }
-    
+
     def _format_message_content(self, content):
         """Format message content to be compatible with frontend."""
         if isinstance(content, str):

@@ -18,7 +18,6 @@ from app.core.di_container import inject
 from app.core.enums import RouterTag
 from app.schemas.ChatRequest import ChatRequest
 from app.services import AgentServiceInterface
-from app.utils.mt5_service import MT5Service
 
 agentic_router = APIRouter(prefix="/agent", tags=[RouterTag.agent.value])
 logger = logging.getLogger(__name__)
@@ -33,21 +32,11 @@ def get_agent_service() -> AgentServiceInterface:
     return inject(AgentServiceInterface)
 
 
-def get_mt5_service() -> MT5Service:
-    """Dependency injection for MT5Service.
-
-    Returns:
-        MT5Service: Injected MT5 service instance
-    """
-    return inject(MT5Service)
-
-
 @agentic_router.post("/chat")
 async def create_and_update_chat(
     user_id: str = Header(...),
     body: ChatRequest = Body(...),
     agent_service: AgentServiceInterface = Depends(get_agent_service),
-    mt5_service: MT5Service = Depends(get_mt5_service),
 ) -> StreamingResponse:
     """Create or continue a chat conversation with an AI agent.
 
@@ -128,9 +117,6 @@ async def create_and_update_chat(
     message: str = body.message
     thread_id: UUID | None | None = body.thread_id
     thread_label: str = body.thread_label  # Now mandatory
-    # message =  inject(ReframeChat).correct(message)
-    # logger.info(f"Corrected message: {message}")
-
     response = agent_service.stream_chat_tokens(
         user_id=user_id, thread_id=thread_id, message=message, thread_label=thread_label
     )

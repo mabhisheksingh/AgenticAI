@@ -1,0 +1,83 @@
+event: delta_encoding
+data: "v1"
+
+data: {"type": "resume_conversation_token", "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb25kdWl0X3V1aWQiOiJiNTdhYjc3ZDFlOTg0NzZjYjdiZDk4ZjY4ZmNhYzZkNiIsImNvbmR1aXRfbG9jYXRpb24iOiIxMC4xMjguMjQxLjIxMTo4MzA1IiwiaWF0IjoxNzU3NTY2NDI3LCJleHAiOjE3NTc1NjcwMjd9.2wYIXd0Sj7SVxIlWMxquQTIwptOEBarMfwaGm5Fmhs2KYtuw2pfvSokUXgVlEt8YF7CZZiy4TzrQcSh6GaU-2A", "conversation_id": "68bc1fbb-6dc8-8320-8b7f-50f8ca9451cf"}
+
+event: delta
+data: {"p": "", "o": "add", "v": {"message": {"id": "814a7635-ee53-4472-a2c5-2861fc6ce5c8", "author": {"role": "assistant", "name": null, "metadata": {}}, "create_time": 1757566427.32151, "update_time": null, "content": {"content_type": "text", "parts": [""]}, "status": "in_progress", "end_turn": null, "weight": 1.0, "metadata": {"citations": [], "content_references": [], "request_id": "97d490379d5309ba-BOS", "message_type": "next", "model_slug": "gpt-5", "default_model_slug": "auto", "parent_id": "f48cb8b1-8fd9-429c-8e9f-2b8ccda9d273", "timestamp_": "absolute", "model_switcher_deny": []}, "recipient": "all", "channel": null}, "conversation_id": "68bc1fbb-6dc8-8320-8b7f-50f8ca9451cf", "error": null}, "c": 0} 
+
+data: {"type": "server_ste_metadata", "metadata": {"conduit_prewarmed": true, "fast_convo": true, "warmup_state": "warm", "is_first_turn": false, "model_slug": "gpt-5", "did_auto_switch_to_reasoning": false, "auto_switcher_race_winner": "autoswitcher", "is_autoswitcher_enabled": true, "is_search": null, "message_id": "814a7635-ee53-4472-a2c5-2861fc6ce5c8", "request_id": "97d490379d5309ba-BOS"}, "conversation_id": "68bc1fbb-6dc8-8320-8b7f-50f8ca9451cf"}
+
+data: {"type": "message_marker", "conversation_id": "68bc1fbb-6dc8-8320-8b7f-50f8ca9451cf", "message_id": "814a7635-ee53-4472-a2c5-2861fc6ce5c8", "marker": "user_visible_token", "event": "first"}
+
+event: delta
+data: {"p": "/message/content/parts/0", "o": "append", "v": "Narendra"}       
+
+event: delta
+data: {"v": " Modi"}  
+
+event: delta
+data: {"v": " (full name"}    
+
+event: delta
+data: {"v": " **Narendra Damodard"}   
+
+event: delta
+data: {"v": "as Modi**) is the **Prime Minister of India**"}  
+
+event: delta
+data: {"v": " since **2014**, representing the **B"}  
+
+event: delta
+data: {"v": "haratiya Janata Party (BJP)**"}  
+
+event: delta
+data: {"v": ".  \n\n- Born on **17 September 195"}    
+
+event: delta
+data: {"v": "0** in **Vadnagar"}      
+
+event: delta
+data: {"v": ", Gujarat**.  \n- Before becoming Prime Minister, he served as the **"}  
+
+event: delta
+data: {"v": "Chief Minister of Gujarat** (2001\u2013"}
+
+event: delta
+data: {"v": "2014).  \n- Known"}      
+
+event: delta
+data: {"v": " for policies like *Digital India"}      
+
+event: delta
+data: {"v": ", Make in India, Swachh"}
+
+event: delta
+data: {"v": " Bharat Abhiyan"}
+
+event: delta
+data: {"v": ", Startup India*, and *Ayushman Bharat"} 
+
+event: delta
+data: {"v": "*.  \n- He has a strong global presence, strengthening India"}   
+
+event: delta
+data: {"v": "\u2019s ties with many countries.  \n\n\ud83d\udc49 Do you want me"}     
+
+event: delta
+data: {"v": " to show how you can make your **research agent with"}   
+
+event: delta
+data: {"v": " Tavily** answer this type of factual question"} 
+
+event: delta
+data: {"v": " automatically?"}
+
+event: delta
+data: {"p": "", "o": "patch", "v": [{"p": "/message/content/parts/0", "o": "append", "v": " automatically?"}, {"p": "/message/status", "o": "replace", "v": "finished_successfully"}, {"p": "/message/end_turn", "o": "replace", "v": true}]} 
+
+data: {"type": "message_stream_complete", "conversation_id": "68bc1fbb-6dc8-8320-8b7f-50f8ca9451cf"}
+
+data: {"type": "conversation_detail_metadata", "banner_info": null, "blocked_features": [], "limits_progress": [{"feature_name": "deep_research", "remaining": 5, "reset_after": "2025-10-11T04:53:52.969569+00:00"}], "default_model_slug": "auto", "conversation_id": "68bc1fbb-6dc8-8320-8b7f-50f8ca9451cf"}
+
+data: [DONE]
