@@ -79,6 +79,14 @@ const useChat = (user_id, thread_id, setThread_id) => {
     let aggregated = '';
     let firstTokenReceived = false; // Track if we've received the first token
     let isProcessing = false; // Track if we're in processing mode
+    let toolCallInfo = ''; // Track tool call information
+
+    // Create a cleanup function to ensure loading is always set to false
+    const cleanup = () => {
+      setLoading(false);
+      isProcessing = false;
+      toolCallInfo = '';
+    };
 
     try {
       // Normalize thread_id - ensure it's null for invalid values
@@ -100,21 +108,16 @@ const useChat = (user_id, thread_id, setThread_id) => {
               return;
             }
             
+            // Handle user message acknowledgment
+            if (obj?.type === 'user' && obj?.content) {
+              // This is just an acknowledgment, we don't need to update the UI
+              return;
+            }
+            
             // Handle processing state
             if (obj?.type === 'processing') {
               isProcessing = true;
               // Update assistant message to show processing state
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantId ? { ...msg, text: 'Processing your request...', isProcessing: true } : msg
-                )
-              );
-              return;
-            }
-            
-            // Handle tool call events
-            if (obj?.type === 'tool_call' && obj?.content) {
-              // Update assistant message to show tool call info
               setMessages((prev) =>
                 prev.map((msg) =>
                   msg.id === assistantId ? { ...msg, text: obj.content, isProcessing: true } : msg
@@ -123,26 +126,44 @@ const useChat = (user_id, thread_id, setThread_id) => {
               return;
             }
             
-            // Handle token streaming
-            if ( (obj?.type === 'token'|| obj?.type === 'user' ) && obj?.content) {
-              // Hide "Thinking..." on first token and exit processing mode
+            // Handle tool call events
+            if (obj?.type === 'tool_call' && obj?.content) {
+              toolCallInfo = obj.content;
+              // Update assistant message to show tool call info
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantId ? { ...msg, text: obj.content, isProcessing: true, toolCall: obj.content } : msg
+                )
+              );
+              return;
+            }
+            
+            // Handle token streaming (only aggregate assistant tokens)
+            if (obj?.type === 'token' && obj?.content) {
+              // Hide "Processing..." on first token and exit processing mode
               if (!firstTokenReceived) {
                 firstTokenReceived = true;
                 isProcessing = false;
-                console.log('First token received, hiding "Thinking..."');
+                toolCallInfo = '';
                 setLoading(false);
               }
               
               aggregated += obj.content;
               setMessages((prev) =>
                 prev.map((msg) =>
-                  msg.id === assistantId ? { ...msg, text: aggregated, isProcessing: false } : msg
+                  msg.id === assistantId ? { 
+                    ...msg, 
+                    text: aggregated, 
+                    isProcessing: false,
+                    toolCall: toolCallInfo || undefined
+                  } : msg
                 )
               );
             } else if (obj?.type === 'error') {
               setError(obj.content || 'Streaming error occurred');
               setLoading(false);
               isProcessing = false;
+              toolCallInfo = '';
               // Update message to show error
               setMessages((prev) =>
                 prev.map((msg) =>
@@ -153,30 +174,34 @@ const useChat = (user_id, thread_id, setThread_id) => {
               // Handle any other unknown event types
               console.log('Unknown event type received:', obj);
             }
-          } catch {
+          } catch (parseError) {
             // Handle plain text fallback
             if (!firstTokenReceived) {
               firstTokenReceived = true;
               isProcessing = false;
-              console.log('First content received (plain text), hiding "Thinking..."');
+              toolCallInfo = '';
               setLoading(false);
             }
             
             aggregated += payload;
             setMessages((prev) =>
               prev.map((msg) =>
-                msg.id === assistantId ? { ...msg, text: aggregated, isProcessing: false } : msg
+                msg.id === assistantId ? { 
+                  ...msg, 
+                  text: aggregated, 
+                  isProcessing: false,
+                  toolCall: toolCallInfo || undefined
+                } : msg
               )
             );
           }
         },
         onDone: () => {
           // Ensure loading is false when streaming is complete
-          setLoading(false);
+          cleanup();
         },
         onError: (err) => {
-          setLoading(false);
-          isProcessing = false;
+          cleanup();
           setError(err.message || 'Failed to send message');
           setMessages((prev) =>
             prev.map((msg) =>
@@ -188,8 +213,7 @@ const useChat = (user_id, thread_id, setThread_id) => {
         },
       });
     } catch (err) {
-      setLoading(false);
-      isProcessing = false;
+      cleanup();
       setError(err.message || 'Failed to send message');
       // Remove the placeholder assistant message and show error message
       setMessages((prev) => [
@@ -233,7 +257,6 @@ const useChat = (user_id, thread_id, setThread_id) => {
         id: msg.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       }));
     
-    console.log('loadMessages: Setting formatted messages:', formattedMessages);
     setMessages(formattedMessages);
   }, []);
 

@@ -5,8 +5,9 @@ import {
   Avatar,
   Paper,
   CircularProgress,
+  Chip,
 } from '@mui/material';
-import { Person, SmartToy } from '@mui/icons-material';
+import { Person, SmartToy, Build } from '@mui/icons-material';
 
 const MessageBubble = ({ message, isLoading = false }) => {
   // Handle loading state
@@ -66,6 +67,7 @@ const MessageBubble = ({ message, isLoading = false }) => {
   const isUser = message.role === 'user';
   const messageContent = message.text || message.content || '';
   const isProcessing = message.isProcessing || false;
+  const toolCall = message.toolCall || '';
   
   // Don't render if there's no content and not loading
   if (!messageContent && !isLoading) {
@@ -129,6 +131,17 @@ const MessageBubble = ({ message, isLoading = false }) => {
         <Typography variant="body2" fontWeight={600} mb={1}>
           {isUser ? 'You' : 'Assistant'}
         </Typography>
+        {toolCall && (
+          <Box mb={1}>
+            <Chip
+              icon={<Build fontSize="small" />}
+              label={toolCall}
+              size="small"
+              color="primary"
+              variant="outlined"
+            />
+          </Box>
+        )}
         <Paper
           elevation={0}
           sx={{

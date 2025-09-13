@@ -5,5 +5,6 @@ export const Endpoints = {
   deleteThread: (threadId) => `/v1/user/threads/${threadId}`,
   renameThreadLabel: (threadId, label) => `/v1/user/rename-thread-label?threadId=${encodeURIComponent(threadId)}&label=${encodeURIComponent(label)}`,
   threadDetails: (threadId) => `/v1/user/thread/${threadId}`,
-  getAllUsers: '/v1/user/get-all'
+  getAllUsers: '/v1/user/get-all',
+  deleteUser: (userId) => `/v1/user/${userId}`
 }

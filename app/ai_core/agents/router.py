@@ -1,17 +1,24 @@
 from datetime import datetime
 import logging
+import os
 import re
 from typing import cast
 
+from dotenv import load_dotenv
+from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 
-from app.ai_core.llm_factory.llm_factory_interface import LLMFactoryInterface
-from app.ai_core.prompts.common_prompts import build_conversation_summary_prompt
+from app.utils.prompt_utils import (
+    build_conversation_summary_prompt,
+    build_final_response_prompt,
+)
 from app.core.di_container import inject
 from app.core.enums import LLMProvider
 from app.schemas.custom_state import CustomState
+from app.utils.llm_utils import MODEL_PROVIDER_MAP, get_temperature
 
+load_dotenv()
 logger = logging.getLogger(__name__)
 
 # Simple cache to reduce repeated LLM calls
@@ -19,23 +26,39 @@ _query_cache = {}
 _last_cache_cleanup = datetime.now()
 
 
+def _get_llm():
+    model_type = LLMProvider.LLM_MEDIUM_MODEL
+    research_model = os.getenv(model_type)
+    if not research_model:
+        raise ValueError(f"{model_type} environment variable is not set")
+
+    router_llm = init_chat_model(
+        model=research_model,
+        model_provider=MODEL_PROVIDER_MAP.get(research_model),
+        temperature=get_temperature(),
+    )
+    return router_llm
+
+
 def _cleanup_cache():
     """Clean up old cache entries to prevent memory issues."""
     global _last_cache_cleanup
     now = datetime.now()
-    
+
     # Clean up cache every 10 minutes
     if (now - _last_cache_cleanup).total_seconds() > 600:
         # Remove entries older than 15 minutes
         cutoff_time = now.timestamp() - 900
         keys_to_remove = [
-            key for key, (_, timestamp) in _query_cache.items()
+            key
+            for key, (_, timestamp) in _query_cache.items()
             if timestamp.timestamp() < cutoff_time
         ]
         for key in keys_to_remove:
             del _query_cache[key]
         _last_cache_cleanup = now
         logger.info(f"Cleaned up {len(keys_to_remove)} old cache entries")
+
 
 def _content_starts_with(content, prefix: str) -> bool:
     """Return True if the given content (str or content-part list) starts with prefix.
@@ -94,7 +117,7 @@ def should_use_llm(query: str) -> bool:
 def llm_split_query(llm: BaseChatModel, query: str) -> list[str]:
     # Clean up cache periodically
     _cleanup_cache()
-    
+
     # Check cache first
     cache_key = f"split_{query}"
     if cache_key in _query_cache:
@@ -103,19 +126,33 @@ def llm_split_query(llm: BaseChatModel, query: str) -> list[str]:
         if (datetime.now() - timestamp).total_seconds() < 300:
             logger.info(f"Using cached result for query splitting: {query}")
             return cached_result
-    
+
     prompt = (
-        """
-        You are an expert at decomposing complex user queries into atomic sub-questions.
-        Given the following user query, split it into a list of minimal, non-overlapping sub-questions, each suitable for a single specialized agent (math, code, research, etc.).
-        Return ONLY the list, one per line, no extra commentary.
-        User Query: """
-        + query
-        + """
+            """
+            You are an expert at decomposing complex user queries into atomic, self-contained sub-questions.
+            Given the following user query, split it into a list of minimal, non-overlapping sub-questions.
+            **Crucially, if a sub-question depends on the context of another (e.g., a name, location, or topic), you must carry that context over.**
+    
+            Example 1:
+            User Query: "Who is the PM of India and what were the results of the latest vice presidential election?"
+            Sub-questions:
+            - Who is the Prime Minister of India?
+            - What were the results of the latest Indian vice presidential election?
+    
+            Example 2:
+            User Query: "What is LangGraph and can you write a python script to implement a basic agent?"
+            Sub-questions:
+            - What is LangGraph?
+            - Write a python script to implement a basic agent using LangGraph.
+    
+            Return ONLY the list of sub-questions, one per line, with no extra commentary.
+            User Query: """
+            + query
+            + """
         """
     )
     response = llm.invoke(prompt)
-    
+
     # Handle different response content formats
     content = response.content
     if isinstance(content, list):
@@ -134,12 +171,12 @@ def llm_split_query(llm: BaseChatModel, query: str) -> list[str]:
         content_text = " ".join(texts)
     else:
         content_text = str(content)
-    
+
     subqueries = [
         line.strip("- ").strip() for line in content_text.strip().split("\n") if line.strip()
     ]
     logger.info("subquires : %s", subqueries)
-    
+
     # Cache the result
     _query_cache[cache_key] = (subqueries, datetime.now())
     return subqueries
@@ -148,7 +185,7 @@ def llm_split_query(llm: BaseChatModel, query: str) -> list[str]:
 def pick_agent_for_subquery(subquery: str) -> str:
     # Clean up cache periodically
     _cleanup_cache()
-    
+
     # Check cache first
     cache_key = f"agent_{subquery}"
     if cache_key in _query_cache:
@@ -157,11 +194,11 @@ def pick_agent_for_subquery(subquery: str) -> str:
         if (datetime.now() - timestamp).total_seconds() < 600:
             logger.info(f"Using cached result for agent picking: {subquery}")
             return cached_result
-    
+
     # Ensure subquery is a string
     if not isinstance(subquery, str):
         subquery = str(subquery)
-    
+
     code_keywords = [
         "code",
         "program",
@@ -184,7 +221,7 @@ def pick_agent_for_subquery(subquery: str) -> str:
         result = "math"
     else:
         result = "research"
-    
+
     # Cache the result
     _query_cache[cache_key] = (result, datetime.now())
     return result
@@ -195,54 +232,42 @@ def should_skip_llm_split(query: str, state: CustomState) -> bool:
     # If this is a follow-up to an active plan, don't re-split
     if state.get("plan_active", False):
         return True
-    
+
     # If we have pending routes, this is part of an ongoing plan
     if state.get("pending_routes", []):
         return True
-        
+
     # If query is simple (single task), don't split
     if not should_use_llm(query):
         return True
-        
+
     return False
 
 
 def summarize_messages(
-    messages: list[BaseMessage], llm_factory: LLMFactoryInterface
-) -> list[BaseMessage]:
+        messages: list[BaseMessage],
+) -> tuple[list[BaseMessage], str]:
     """
     Summarize older conversation history to keep message list short for LLM context.
-    Keeps the last 3 messages and summarizes the rest using a summarization LLM.
+    Returns (trimmed_messages, summary_text). The summary_text is intended to be
+    injected only where needed (e.g., research agent), NOT into the messages list.
     """
     if len(messages) <= 6:
-        return messages
-    
-    # Check if we already have a recent summary to avoid redundant summarization
-    last_message = messages[-1] if messages else None
-    if last_message and isinstance(last_message, AIMessage):
-        last_content = getattr(last_message, 'content', '')
-        if _content_starts_with(last_content, 'Summary of previous conversation:'):
-            # If the last message is already a summary, we might not need to summarize again
-            # unless the conversation has grown significantly
-            if len(messages) <= 8:  # Allow a bit more before re-summarizing
-                return messages
-    
+        return messages, ""
+
     try:
         recent_messages = messages[-3:]
         older_messages_text = "\n".join(
             [f"{type(msg).__name__}: {getattr(msg, 'content', '')}" for msg in messages[:-3]]
         )
-        summarization_llm = llm_factory.create_model(
-            LLMProvider.LLM_SUMMARIZATION_MODEL, with_tools=False
-        )
+        summarization_llm = _get_llm()
         summary_prompt = build_conversation_summary_prompt(older_messages_text)
         summary_response = summarization_llm.invoke(summary_prompt)
-        summary_content = str(getattr(summary_response, "content", "Previous conversation history"))
-        summary_message = AIMessage(content=f"Summary of previous conversation: {summary_content}")
-        return [summary_message] + recent_messages
+        summary_content = str(getattr(summary_response, "content", ""))
+        return recent_messages, summary_content
     except Exception as e:
         logger.warning(f"Error summarizing messages, returning recent messages only: {e}")
-        return messages[-3:]
+        return messages[-3:], ""
 
 
 # ---- Router ----
@@ -255,6 +280,79 @@ def router(state: CustomState) -> CustomState:
     messages = state.get("messages", [])
     query = extract_query(state)
     logger.info(f"Routing query: {query}")
+
+    # Fast-path: handle greetings / introductions quickly without tools or extra LLM calls
+    ql = (query or "").strip().lower()
+    if ql and (re.match(r"^(hi|hello|hey)\b", ql) or re.search(r"\b(i am|i'm)\b", ql)):
+        # Try to extract a name if the user introduced themselves
+        name_match = re.search(
+            r"\b(?:i am|i'm)\s+([A-Za-z][A-Za-z\s\.'-]{0,40})\b", query, flags=re.IGNORECASE
+        )
+        if name_match:
+            name = name_match.group(1).strip().split()[0]
+            reply = f"Nice to meet you, {name}! How can I help you today?"
+        else:
+            reply = "Hi! How can I help you today?"
+
+        quick_msg = AIMessage(content=reply, tool_calls=[], response_metadata={})
+        # Some downstream components expect a metadata attribute
+        try:
+            quick_msg.metadata = {}
+        except Exception:
+            pass
+
+        final_messages = list(messages) + [quick_msg]
+        return cast(
+            CustomState,
+            {
+                **state,
+                "messages": final_messages,
+                "route": "__end__",
+                "plan_active": False,
+                "pending_routes": [],
+                "routing_plan": [],
+            },
+        )
+
+    # If a routing plan was just completed, generate the final response directly.
+    if state.get("plan_active") and not state.get("routing_plan"):
+        logger.info("Routing plan completed. Generating final response.")
+
+        # 1. Get the LLM and prompt for final response synthesis.
+        llm = _get_llm()
+        prompt = build_final_response_prompt()
+        response_chain = prompt | llm
+
+        # 2. Sanitize the history to only include the user query and tool results.
+        history = state.get("messages", [])
+        user_query = next((msg for msg in history if isinstance(msg, HumanMessage)), None)
+        tool_results = [msg for msg in history if isinstance(msg, ToolMessage)]
+        clean_input = {"messages": [user_query] + tool_results}
+
+        # 3. Invoke the chain to get the final answer.
+        raw_response = response_chain.invoke(clean_input)
+
+        # 4. Sanitize the final response and add the required metadata attribute for the streaming service.
+        final_response = AIMessage(
+            content=str(raw_response.content), tool_calls=[], response_metadata={}
+        )
+        final_response.tool_calls = []
+        final_response.metadata = {}
+
+        # 5. Update the state with the final message and signal the end.
+        final_messages = list(messages) + [final_response]
+        new_state = cast(
+            CustomState,
+            {
+                **state,
+                "messages": final_messages,
+                "route": "__end__",
+                "plan_active": False,
+            },
+        )
+        if "tool_calls" in new_state:
+            del new_state["tool_calls"]
+        return new_state
 
     # Check if we should skip LLM-based splitting to reduce load
     if should_skip_llm_split(query, state):
@@ -280,10 +378,10 @@ def router(state: CustomState) -> CustomState:
 
         # If plan is exhausted, hand off to the formatting agent for final output
         if state.get("plan_active"):
-            logger.info("Routing plan completed. Handing off to nlp_formatting.")
+            logger.info("Routing plan completed.")
             return cast(
                 CustomState,
-                {**state, "route": "nlp_formatting", "pending_routes": [], "plan_active": False},
+                {**state, "route": "__end__", "pending_routes": [], "plan_active": False},
             )
 
         # If the query is trivial (single task), route directly to the right agent
@@ -293,8 +391,7 @@ def router(state: CustomState) -> CustomState:
             return cast(CustomState, {**state, "route": direct_route, "pending_routes": []})
 
     # For complex queries, use LLM to split into sub-queries and build a routing plan
-    router_llm_factory = inject(LLMFactoryInterface)
-    router_llm = router_llm_factory.create_model(LLMProvider.LLM_MEDIUM_MODEL, with_tools=False)
+    router_llm = _get_llm()
     subqueries = llm_split_query(router_llm, query)
     routing_plan: list[tuple[str, str]] = []
     for subq in subqueries:

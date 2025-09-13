@@ -17,15 +17,13 @@ from typing import cast
 import uuid
 from uuid import UUID
 
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import StateSnapshot
 
 from app.ai_core.agents.router import summarize_messages
-from app.ai_core.llm_factory.llm_factory_interface import LLMFactoryInterface
 from app.ai_core.state_graph_object import StateGraphObject
 from app.core.di_container import inject
-from app.core.enums import LLMProvider
 from app.repositories import DatabaseConnectionProvider, ThreadRepositoryInterface
 from app.services import (
     AgentExecutionInterface,
@@ -84,10 +82,9 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
     """
 
     def __init__(
-        self,
-        llm_provider: LLMFactoryInterface,
-        thread_repository: ThreadRepositoryInterface,
-        db_provider: DatabaseConnectionProvider,
+            self,
+            thread_repository: ThreadRepositoryInterface,
+            db_provider: DatabaseConnectionProvider,
     ):
         """Initialize the LangGraphService with StateGraphObject.
 
@@ -97,10 +94,7 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
             db_provider: Database connection provider
         """
         self._thread_repository = thread_repository
-
-        # Initialize LLM and create StateGraphObject
-        llm = llm_provider.create_model(LLMProvider.LLM_MEDIUM_MODEL)
-        self.state_graph_obj = StateGraphObject(llm, db_provider)
+        self.state_graph_obj = StateGraphObject(db_provider)
         self.graph = self.state_graph_obj.prepare_state_graph()
 
     @staticmethod
@@ -136,11 +130,11 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
         return state
 
     def execute_agent(
-        self,
-        message: str,
-        thread_id: UUID | None,
-        user_id: str,
-        thread_label: str,
+            self,
+            message: str,
+            thread_id: UUID | None,
+            user_id: str,
+            thread_label: str,
     ) -> AsyncGenerator[str, None]:
         """Execute AI agent and stream response tokens.
 
@@ -167,11 +161,11 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
         return self._execute_agent_impl(message, thread_id, user_id, thread_label)
 
     async def _execute_agent_impl(
-        self,
-        message: str,
-        thread_id: UUID | None,
-        user_id: str,
-        thread_label: str,
+            self,
+            message: str,
+            thread_id: UUID | None,
+            user_id: str,
+            thread_label: str,
     ) -> AsyncGenerator[str, None]:
         """Execute AI agent using StateGraphObject and stream response tokens."""
         logger.info("StateGraphObject: Starting agent execution")
@@ -187,9 +181,12 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
 
         # Summarize/prune messages if too long before streaming
         MAX_MESSAGES = 10
+        summary_text = ""
         if len(chat_messages) > MAX_MESSAGES:
-            chat_messages = summarize_messages(chat_messages, inject(LLMFactoryInterface))
-            logger.info(f"[SUPERVISOR] Summarized chat history due to length > {MAX_MESSAGES}")
+            chat_messages, summary_text = summarize_messages(chat_messages)
+            logger.info(
+                f"[LANGGRAPH SERVICE] Summarized chat history due to length > {MAX_MESSAGES}"
+            )
 
         # Remove any blank messages to keep history clean
         if chat_messages:
@@ -197,7 +194,9 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
             chat_messages = [m for m in chat_messages if not _is_blank_message(m)]
             after = len(chat_messages)
             if after != before:
-                logger.info(f"Filtered {before - after} blank messages from history before streaming")
+                logger.info(
+                    f"Filtered {before - after} blank messages from history before streaming"
+                )
 
         # Initial metadata event
         yield f"data: {json.dumps({'threadId': str(thread_id), 'userId': user_id})}\n\n"
@@ -217,105 +216,69 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
             # Note: We don't include the query or answer fields in the initial state to avoid
             # concurrent update errors. These are extracted from messages when needed.
             initial_state = {
-                "messages": chat_messages,
+                "messages": message,
             }
+
+            # Track AI messages we've already streamed (by id if available)
+            streamed_message_ids: set[str] = set()
 
             # Stream through StateGraphObject
             logger.info(
-                f"[SUPERVISOR] Starting graph streaming for thread_id={thread_id}, user_id={user_id}, initial_state={initial_state}"
+                f"[LANGGRAPH SERVICE] Starting graph streaming for thread_id={thread_id}, user_id={user_id}, initial_state={initial_state}"
             )
             for chunk in self.graph.stream(
-                initial_state, config=config, stream_mode="updates", debug=True
+                    initial_state,
+                    config,
+                    stream_mode="updates",
             ):
-                logger.info(f"[SUPERVISOR] Chunk received: {chunk}")
-                # Handle streaming chunks
-                if isinstance(chunk, dict):
-                    for node_name, state_update in chunk.items():
-                        logger.info(
-                            f"[SUPERVISOR] Node {node_name} produced update: {state_update}"
+                # With stream_mode='updates', chunk is a dict of node_name -> state_update
+                if not isinstance(chunk, dict):
+                    logger.warning(
+                        f"[LANGGRAPH SERVICE] Unexpected chunk type: {type(chunk)} -> {chunk}"
+                    )
+                    continue
+                for node_name, node_update in chunk.items():
+                    if not isinstance(node_update, dict):
+                        logger.debug(
+                            f"[LANGGRAPH SERVICE] Skipping non-dict node update from {node_name}: {node_update}"
                         )
-                        # Check if the update is None (can happen with some graph configurations)
-                        if state_update is None:
-                            logger.warning(
-                                f"[SUPERVISOR] Node {node_name} returned None update, skipping"
-                            )
-                            continue
-                        # Check if the update contains new messages
-                        if state_update.get("messages"):
-                            messages = state_update["messages"]
-                            if isinstance(messages, list) and len(messages) > 0:
-                                latest_message = messages[-1]  # Get the last message
-                                # Check if it's an AI message with content
-                                if (
-                                    hasattr(latest_message, "tool_calls")
-                                    and latest_message.tool_calls
-                                ):
-                                    for tool_call in latest_message.tool_calls:
-                                        logger.info(
-                                            f"[SUPERVISOR] Tool call detected: {tool_call['name']} with args: {tool_call.get('args', {})}"
-                                        )
-                                        # Send tool call info to frontend
-                                        tool_name = tool_call['name']
-                                        yield f"data: {json.dumps({'type': 'tool_call', 'content': f'Executing {tool_name}...', 'metadata': {'node': node_name}})}\n\n"
-                                if hasattr(latest_message, "content"):
-                                    content = latest_message.content
-                                    # Handle different content types
-                                    if isinstance(content, list):
-                                        # Extract human-readable text from content parts
-                                        parts: list[str] = []
-                                        for item in content:
-                                            if isinstance(item, str):
-                                                parts.append(item)
-                                            elif isinstance(item, dict):
-                                                if item.get("type") == "text":
-                                                    parts.append(str(item.get("text", "")))
-                                                else:
-                                                    # Fallback to string for non-text parts
-                                                    parts.append(str(item))
-                                            else:
-                                                parts.append(str(item))
-                                        content = " ".join([p for p in parts if p])
-                                    elif not isinstance(content, str):
-                                        # If content is not a string, convert it to string
-                                        content = str(content)
+                        continue
+                    logger.info(
+                        f"[LANGGRAPH SERVICE] Update from node={node_name}, keys={list(node_update.keys())}"
+                    )
 
-                                    # Check if content is not empty
-                                    if content and content.strip():
-                                        # For AIMessages, we should stream the content as tokens
-                                        # Split the content into words and stream them one by one
-                                        words = content.split()
-                                        current_chunk = ""
-                                        for i, word in enumerate(words):
-                                            current_chunk += word + " "
-                                            # Send a chunk every few words or at the end
-                                            if (i + 1) % 10 == 0 or i == len(words) - 1:
-                                                yield f"data: {json.dumps({'type': 'token', 'content': current_chunk.strip(), 'metadata': {'node': node_name}})}\n\n"
-                                                current_chunk = ""
-                                    elif (
-                                        hasattr(latest_message, "tool_calls")
-                                        and latest_message.tool_calls
-                                    ):
-                                        # This is a tool call, we don't stream it but log it
+                    # Stream any new AIMessage content from this node update
+                    messages_update = node_update.get("messages")
+                    if isinstance(messages_update, list):
+                        for msg in messages_update:
+                            if isinstance(msg, AIMessage):
+                                # Deduplicate by id if available; fallback to content hash
+                                msg_id = getattr(msg, "id", None)
+                                key = (
+                                    str(msg_id)
+                                    if msg_id
+                                    else f"{node_name}:{hash(_content_to_text(getattr(msg, 'content', '')))}"
+                                )
+                                if key in streamed_message_ids:
+                                    continue
+                                text = _content_to_text(getattr(msg, "content", ""))
+                                if text and text.strip():
+                                    yield f"data: {json.dumps({'type': 'token', 'content': text, 'metadata': {'node': node_name}})}\n\n"
+                                    streamed_message_ids.add(key)
+
+                    # Also, check for any tool calls to provide updates to the UI.
+                    # Only emit tool_call events when the actual tools node runs to avoid noise.
+                    if node_name == "tools":
+                        messages = node_update.get("messages")
+                        if isinstance(messages, list):
+                            for msg in messages:
+                                if hasattr(msg, "tool_calls") and getattr(msg, "tool_calls", None):
+                                    for tool_call in msg.tool_calls:
+                                        tool_name = tool_call.get("name", "tool")
                                         logger.info(
-                                            f"Tool call generated: {latest_message.tool_calls}"
+                                            f"[SUPERVISOR] Tool call detected: {tool_name} with args: {tool_call.get('args', {})}"
                                         )
-                        elif state_update.get("answer"):
-                            # This is likely from one of the agent nodes
-                            content = str(state_update["answer"])
-                            # Split the content into words and stream them one by one
-                            words = content.split()
-                            current_chunk = ""
-                            for i, word in enumerate(words):
-                                current_chunk += word + " "
-                                # Send a chunk every few words or at the end
-                                if (i + 1) % 10 == 0 or i == len(words) - 1:
-                                    yield f"data: {json.dumps({'type': 'token', 'content': current_chunk.strip(), 'metadata': {'node': node_name}})}\n\n"
-                                    current_chunk = ""
-                        else:
-                            # Handle case where update doesn't contain expected fields
-                            logger.warning(
-                                f"Node {node_name} returned update without expected fields: {state_update}"
-                            )
+                                        yield f"data: {json.dumps({'type': 'tool_call', 'content': f'Executing {tool_name}...', 'metadata': {'node': node_name}})}\n\n"
 
             logger.info(f"StateGraphObject streaming completed for thread {thread_id}")
 
@@ -327,7 +290,7 @@ class LangGraphServiceImpl(AgentExecutionInterface, ConversationStateInterface):
         yield "data: [DONE]\n\n"
 
     def load_and_update_thread(
-        self, thread_id: UUID | None, user_id: str, thread_label: str
+            self, thread_id: UUID | None, user_id: str, thread_label: str
     ) -> tuple[list[BaseMessage], UUID]:
         """Load or create conversation thread with message history.
 
